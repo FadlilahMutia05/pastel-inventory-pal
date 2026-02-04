@@ -74,6 +74,7 @@ export default function Header({ title }: HeaderProps) {
   const lowStockCount = lowStockProducts?.length || 0;
   const { data: settings } = useStoreSettings();
 
+  const storeName = settings?.store_name || "Mao~Mao Store";
   const logoUrl = settings?.logo_url;
   const logoEmoji = settings?.logo_emoji || "🎁";
 
@@ -91,7 +92,7 @@ export default function Header({ title }: HeaderProps) {
           </div>
           <div className="hidden sm:block">
             <h1 className="font-display font-bold text-lg text-foreground">
-              {title}
+              {storeName}
             </h1>
           </div>
         </div>
