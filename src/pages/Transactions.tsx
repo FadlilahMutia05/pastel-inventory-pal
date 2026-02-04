@@ -17,7 +17,9 @@ import {
   Calendar,
   Trash2,
   Pencil,
+  FileText,
 } from "lucide-react";
+import { DailyRecapDialog } from "@/components/transactions/DailyRecapDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -107,6 +109,7 @@ export default function Transactions() {
   const [editTransaction, setEditTransaction] = useState<Transaction | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [deleteTransaction, setDeleteTransaction] = useState<Transaction | null>(null);
+  const [showRecapDialog, setShowRecapDialog] = useState(false);
 
   // Edit form states
   const [editCustomerName, setEditCustomerName] = useState("");
@@ -392,29 +395,39 @@ export default function Transactions() {
               {filteredTransactions?.length || 0} transaksi
             </p>
           </div>
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => {
-              const messages = generateBulkMessages();
-              if (messages) {
-                copyToClipboard(messages, "bulk");
-              } else {
-                toast({
-                  title: "Tidak ada resi",
-                  description: "Tidak ada transaksi shipped dengan nomor resi",
-                  variant: "destructive",
-                });
-              }
-            }}
-          >
-            {copied === "bulk" ? (
-              <Check className="w-4 h-4" />
-            ) : (
-              <Copy className="w-4 h-4" />
-            )}
-            Export Resi Grup
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => setShowRecapDialog(true)}
+            >
+              <FileText className="w-4 h-4" />
+              Rekap Resi
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => {
+                const messages = generateBulkMessages();
+                if (messages) {
+                  copyToClipboard(messages, "bulk");
+                } else {
+                  toast({
+                    title: "Tidak ada resi",
+                    description: "Tidak ada transaksi shipped dengan nomor resi",
+                    variant: "destructive",
+                  });
+                }
+              }}
+            >
+              {copied === "bulk" ? (
+                <Check className="w-4 h-4" />
+              ) : (
+                <Copy className="w-4 h-4" />
+              )}
+              Export WA
+            </Button>
+          </div>
         </motion.div>
 
         {/* Filters */}
@@ -887,6 +900,13 @@ export default function Transactions() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Daily Recap Dialog */}
+      <DailyRecapDialog
+        open={showRecapDialog}
+        onOpenChange={setShowRecapDialog}
+        transactions={transactions || []}
+      />
     </AppLayout>
   );
 }
