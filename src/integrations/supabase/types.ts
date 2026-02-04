@@ -187,6 +187,7 @@ export type Database = {
       }
       products: {
         Row: {
+          brand: string | null
           category: string
           created_at: string
           description: string | null
@@ -197,11 +198,13 @@ export type Database = {
           pcs_per_set: number
           photo_url: string | null
           selling_price: number
+          series: string | null
           sets_per_karton: number
           sku: string
           updated_at: string
         }
         Insert: {
+          brand?: string | null
           category?: string
           created_at?: string
           description?: string | null
@@ -212,11 +215,13 @@ export type Database = {
           pcs_per_set?: number
           photo_url?: string | null
           selling_price?: number
+          series?: string | null
           sets_per_karton?: number
           sku: string
           updated_at?: string
         }
         Update: {
+          brand?: string | null
           category?: string
           created_at?: string
           description?: string | null
@@ -227,6 +232,7 @@ export type Database = {
           pcs_per_set?: number
           photo_url?: string | null
           selling_price?: number
+          series?: string | null
           sets_per_karton?: number
           sku?: string
           updated_at?: string
