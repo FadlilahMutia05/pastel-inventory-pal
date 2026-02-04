@@ -16,6 +16,7 @@ import {
   XCircle,
   Calendar,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
   Table,
@@ -60,12 +63,17 @@ interface Transaction {
   id: string;
   transaction_code: string;
   customer_name: string;
+  customer_phone: string | null;
   customer_city: string | null;
+  customer_address: string | null;
   courier: string;
+  shipping_type: string;
   tracking_number: string | null;
   status: string;
   total_amount: number;
   total_profit: number;
+  shipping_cost: number | null;
+  notes: string | null;
   transaction_date: string;
 }
 
@@ -96,8 +104,43 @@ export default function Transactions() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("");
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [editTransaction, setEditTransaction] = useState<Transaction | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [deleteTransaction, setDeleteTransaction] = useState<Transaction | null>(null);
+
+  // Edit form states
+  const [editCustomerName, setEditCustomerName] = useState("");
+  const [editCustomerPhone, setEditCustomerPhone] = useState("");
+  const [editCustomerCity, setEditCustomerCity] = useState("");
+  const [editCustomerAddress, setEditCustomerAddress] = useState("");
+  const [editCourier, setEditCourier] = useState("");
+  const [editShippingType, setEditShippingType] = useState("");
+  const [editTrackingNumber, setEditTrackingNumber] = useState("");
+  const [editShippingCost, setEditShippingCost] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+
+  // Shipping type and courier options
+  const shippingTypes = ["instant", "same_day", "normal", "cargo"];
+  const couriersByType: Record<string, string[]> = {
+    instant: ["GoSend", "GrabExpress", "Lalamove"],
+    same_day: ["JNE YES", "SiCepat BEST", "AnterAja Same Day"],
+    normal: ["JNE REG", "JNE OKE", "SiCepat REG", "SiCepat HALU", "AnterAja REG", "J&T Express", "Ninja Express", "ID Express"],
+    cargo: ["JNE Trucking", "SiCepat Cargo", "Indah Cargo", "J&T Cargo", "SPX Cargo", "Kargo Kilat"],
+  };
+
+  // Initialize edit form when editTransaction changes
+  const openEditDialog = (transaction: Transaction) => {
+    setEditTransaction(transaction);
+    setEditCustomerName(transaction.customer_name);
+    setEditCustomerPhone(transaction.customer_phone || "");
+    setEditCustomerCity(transaction.customer_city || "");
+    setEditCustomerAddress(transaction.customer_address || "");
+    setEditCourier(transaction.courier);
+    setEditShippingType(transaction.shipping_type || "normal");
+    setEditTrackingNumber(transaction.tracking_number || "");
+    setEditShippingCost(transaction.shipping_cost?.toString() || "0");
+    setEditNotes(transaction.notes || "");
+  };
 
   // Query transactions
   const { data: transactions, isLoading } = useQuery({
@@ -160,7 +203,54 @@ export default function Transactions() {
         description: "Status transaksi berhasil diubah",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update transaction mutation
+  const updateTransactionMutation = useMutation({
+    mutationFn: async (data: {
+      id: string;
+      customer_name: string;
+      customer_phone: string | null;
+      customer_city: string | null;
+      customer_address: string | null;
+      courier: string;
+      shipping_type: string;
+      tracking_number: string | null;
+      shipping_cost: number;
+      notes: string | null;
+    }) => {
+      const { error } = await supabase
+        .from("sales_transactions")
+        .update({
+          customer_name: data.customer_name,
+          customer_phone: data.customer_phone || null,
+          customer_city: data.customer_city || null,
+          customer_address: data.customer_address || null,
+          courier: data.courier,
+          shipping_type: data.shipping_type,
+          tracking_number: data.tracking_number || null,
+          shipping_cost: data.shipping_cost,
+          notes: data.notes || null,
+        })
+        .eq("id", data.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sales-transactions"] });
+      setEditTransaction(null);
+      toast({
+        title: "Transaksi diperbarui",
+        description: "Data transaksi berhasil diperbarui",
+      });
+    },
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message,
@@ -216,7 +306,7 @@ export default function Transactions() {
         description: "Transaksi berhasil dihapus dan stok dikembalikan",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message,
@@ -224,6 +314,22 @@ export default function Transactions() {
       });
     },
   });
+
+  const handleSaveEdit = () => {
+    if (!editTransaction) return;
+    updateTransactionMutation.mutate({
+      id: editTransaction.id,
+      customer_name: editCustomerName.trim(),
+      customer_phone: editCustomerPhone.trim() || null,
+      customer_city: editCustomerCity.trim() || null,
+      customer_address: editCustomerAddress.trim() || null,
+      courier: editCourier,
+      shipping_type: editShippingType,
+      tracking_number: editTrackingNumber.trim() || null,
+      shipping_cost: parseFloat(editShippingCost) || 0,
+      notes: editNotes.trim() || null,
+    });
+  };
 
   const filteredTransactions = transactions?.filter((t) => {
     const matchesSearch =
@@ -478,6 +584,14 @@ export default function Transactions() {
                               <Button
                                 size="sm"
                                 variant="ghost"
+                                className="text-primary hover:text-primary hover:bg-primary/10"
+                                onClick={() => openEditDialog(transaction)}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
                                 className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                 onClick={() => setDeleteTransaction(transaction)}
                               >
@@ -585,6 +699,152 @@ export default function Transactions() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Transaction Dialog */}
+      <Dialog open={!!editTransaction} onOpenChange={() => setEditTransaction(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Transaksi</DialogTitle>
+            <DialogDescription>
+              Kode: <span className="font-mono">{editTransaction?.transaction_code}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Customer Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Nama Customer *</Label>
+                <Input
+                  id="edit-name"
+                  value={editCustomerName}
+                  onChange={(e) => setEditCustomerName(e.target.value)}
+                  placeholder="Nama customer"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-phone">No. Telepon</Label>
+                <Input
+                  id="edit-phone"
+                  value={editCustomerPhone}
+                  onChange={(e) => setEditCustomerPhone(e.target.value)}
+                  placeholder="08xxxxxxxxxx"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-city">Kota</Label>
+                <Input
+                  id="edit-city"
+                  value={editCustomerCity}
+                  onChange={(e) => setEditCustomerCity(e.target.value)}
+                  placeholder="Kota tujuan"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-shipping-cost">Ongkir</Label>
+                <Input
+                  id="edit-shipping-cost"
+                  type="number"
+                  value={editShippingCost}
+                  onChange={(e) => setEditShippingCost(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-address">Alamat Lengkap</Label>
+              <Textarea
+                id="edit-address"
+                value={editCustomerAddress}
+                onChange={(e) => setEditCustomerAddress(e.target.value)}
+                placeholder="Alamat lengkap pengiriman"
+                rows={2}
+              />
+            </div>
+
+            {/* Shipping Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Tipe Pengiriman</Label>
+                <Select value={editShippingType} onValueChange={(val) => {
+                  setEditShippingType(val);
+                  // Reset courier if current not in new type's list
+                  if (!couriersByType[val]?.includes(editCourier)) {
+                    setEditCourier(couriersByType[val]?.[0] || "");
+                  }
+                }}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {shippingTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type === "instant" ? "Instant" : type === "same_day" ? "Same Day" : type === "normal" ? "Normal" : "Cargo"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Kurir</Label>
+                <Select value={editCourier} onValueChange={setEditCourier}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {couriersByType[editShippingType]?.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Tracking Number - Highlighted */}
+            <div className="space-y-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
+              <Label htmlFor="edit-tracking" className="text-primary font-medium">
+                Nomor Resi 📦
+              </Label>
+              <Input
+                id="edit-tracking"
+                value={editTrackingNumber}
+                onChange={(e) => setEditTrackingNumber(e.target.value)}
+                placeholder="Masukkan nomor resi"
+                className="font-mono"
+              />
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-notes">Catatan</Label>
+              <Textarea
+                id="edit-notes"
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                placeholder="Catatan tambahan (opsional)"
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setEditTransaction(null)}>
+              Batal
+            </Button>
+            <Button
+              onClick={handleSaveEdit}
+              disabled={!editCustomerName.trim() || updateTransactionMutation.isPending}
+            >
+              {updateTransactionMutation.isPending ? "Menyimpan..." : "Simpan Perubahan"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
