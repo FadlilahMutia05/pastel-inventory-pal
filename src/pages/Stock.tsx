@@ -51,6 +51,8 @@ interface ProductStock {
   selling_price: number;
   low_stock_threshold: number;
   is_active: boolean;
+  pcs_per_set: number;
+  sets_per_karton: number;
   totalStock: number;
   totalValue: number;
   avgCostPrice: number;

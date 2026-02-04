@@ -17,9 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { Package, Minus } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
+
+type UnitType = "pcs" | "set" | "karton";
 
 const SHIPPING_TYPES = [
   { value: "instant", label: "Instant" },
@@ -43,6 +46,8 @@ interface StockOutDialogProps {
     photo_url: string | null;
     selling_price: number;
     totalStock: number;
+    pcs_per_set?: number;
+    sets_per_karton?: number;
   } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -53,6 +58,7 @@ export function StockOutDialog({ product, open, onOpenChange }: StockOutDialogPr
   const queryClient = useQueryClient();
   
   const [quantity, setQuantity] = useState("1");
+  const [unitType, setUnitType] = useState<UnitType>("pcs");
   const [customPrice, setCustomPrice] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -63,6 +69,25 @@ export function StockOutDialog({ product, open, onOpenChange }: StockOutDialogPr
   const [shippingCost, setShippingCost] = useState("");
   const [isCustomCourier, setIsCustomCourier] = useState(false);
   const [customCourier, setCustomCourier] = useState("");
+
+  const pcsPerSet = product?.pcs_per_set || 1;
+  const setsPerKarton = product?.sets_per_karton || 1;
+  const pcsPerKarton = pcsPerSet * setsPerKarton;
+
+  // Calculate total pcs based on unit type
+  const calculateTotalPcs = () => {
+    const qty = parseInt(quantity) || 0;
+    switch (unitType) {
+      case "set":
+        return qty * pcsPerSet;
+      case "karton":
+        return qty * pcsPerKarton;
+      default:
+        return qty;
+    }
+  };
+
+  const totalPcs = calculateTotalPcs();
 
   const handleShippingTypeChange = (type: string) => {
     setShippingType(type);
@@ -87,13 +112,12 @@ export function StockOutDialog({ product, open, onOpenChange }: StockOutDialogPr
       if (!product) throw new Error("Produk tidak ditemukan");
       if (!customerName) throw new Error("Nama customer wajib diisi");
 
-      const qty = parseInt(quantity);
-      if (qty <= 0) throw new Error("Jumlah harus lebih dari 0");
-      if (qty > product.totalStock) throw new Error("Stok tidak mencukupi");
+      if (totalPcs <= 0) throw new Error("Jumlah harus lebih dari 0");
+      if (totalPcs > product.totalStock) throw new Error("Stok tidak mencukupi");
 
       const unitPrice = customPrice ? parseFloat(customPrice) : product.selling_price;
       const shipping = parseFloat(shippingCost) || 0;
-      const subtotal = unitPrice * qty;
+      const subtotal = unitPrice * totalPcs;
       const total = subtotal + shipping;
 
       // Create transaction
@@ -118,7 +142,7 @@ export function StockOutDialog({ product, open, onOpenChange }: StockOutDialogPr
       if (transactionError) throw transactionError;
 
       // Process FIFO stock deduction
-      let remainingQty = qty;
+      let remainingQty = totalPcs;
       let totalProfit = 0;
 
       const { data: batches, error: batchesError } = await supabase
@@ -170,6 +194,7 @@ export function StockOutDialog({ product, open, onOpenChange }: StockOutDialogPr
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products-list"] });
       queryClient.invalidateQueries({ queryKey: ["products-stock-monitoring"] });
+      queryClient.invalidateQueries({ queryKey: ["products-for-sale"] });
       queryClient.invalidateQueries({ queryKey: ["sales-transactions"] });
       onOpenChange(false);
       resetForm();
@@ -189,6 +214,7 @@ export function StockOutDialog({ product, open, onOpenChange }: StockOutDialogPr
 
   const resetForm = () => {
     setQuantity("1");
+    setUnitType("pcs");
     setCustomPrice("");
     setCustomerName("");
     setCustomerPhone("");
@@ -204,10 +230,20 @@ export function StockOutDialog({ product, open, onOpenChange }: StockOutDialogPr
   if (!product) return null;
 
   const unitPrice = customPrice ? parseFloat(customPrice) : product.selling_price;
-  const qty = parseInt(quantity) || 0;
   const shipping = parseFloat(shippingCost) || 0;
-  const subtotal = unitPrice * qty;
+  const subtotal = unitPrice * totalPcs;
   const total = subtotal + shipping;
+
+  const getUnitLabel = () => {
+    switch (unitType) {
+      case "set":
+        return `Set (${pcsPerSet} pcs/set)`;
+      case "karton":
+        return `Karton (${pcsPerKarton} pcs/karton)`;
+      default:
+        return "Pcs";
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -234,25 +270,56 @@ export function StockOutDialog({ product, open, onOpenChange }: StockOutDialogPr
               <p className="text-sm text-muted-foreground">{product.sku}</p>
             </div>
             <div className="text-right">
-              <p className="text-sm text-muted-foreground">Stok: {product.totalStock}</p>
-              <p className="font-medium text-primary">{formatCurrency(product.selling_price)}</p>
+              <p className="text-sm text-muted-foreground">Stok: {product.totalStock} pcs</p>
+              <p className="font-medium text-primary">{formatCurrency(product.selling_price)}/pcs</p>
             </div>
+          </div>
+
+          {/* Unit Type Selection */}
+          <div className="space-y-2">
+            <Label>Satuan</Label>
+            <RadioGroup
+              value={unitType}
+              onValueChange={(v) => setUnitType(v as UnitType)}
+              className="flex gap-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="pcs" id="out-pcs" />
+                <Label htmlFor="out-pcs" className="cursor-pointer">Pcs</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="set" id="out-set" />
+                <Label htmlFor="out-set" className="cursor-pointer">
+                  Set <span className="text-xs text-muted-foreground">({pcsPerSet} pcs)</span>
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="karton" id="out-karton" />
+                <Label htmlFor="out-karton" className="cursor-pointer">
+                  Karton <span className="text-xs text-muted-foreground">({pcsPerKarton} pcs)</span>
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
 
           {/* Quantity & Price */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>Jumlah *</Label>
+              <Label>Jumlah ({getUnitLabel()}) *</Label>
               <Input
                 type="number"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 min={1}
-                max={product.totalStock}
               />
+              {totalPcs > 0 && unitType !== "pcs" && (
+                <p className="text-sm text-muted-foreground">
+                  = <span className="font-medium text-foreground">{totalPcs}</span> pcs
+                </p>
+              )}
             </div>
             <div className="space-y-2">
-              <Label>Harga Jual (opsional)</Label>
+              <Label>Harga Jual per Pcs (opsional)</Label>
               <Input
                 type="number"
                 value={customPrice}
@@ -373,7 +440,7 @@ export function StockOutDialog({ product, open, onOpenChange }: StockOutDialogPr
           {/* Summary */}
           <div className="space-y-2 pt-4 border-t">
             <div className="flex justify-between text-sm">
-              <span>Subtotal ({qty} pcs)</span>
+              <span>Subtotal ({totalPcs} pcs)</span>
               <span>{formatCurrency(subtotal)}</span>
             </div>
             <div className="flex justify-between text-sm">
@@ -398,7 +465,7 @@ export function StockOutDialog({ product, open, onOpenChange }: StockOutDialogPr
             <Button
               className="flex-1"
               onClick={() => stockOutMutation.mutate()}
-              disabled={stockOutMutation.isPending || !customerName || qty <= 0}
+              disabled={stockOutMutation.isPending || !customerName || totalPcs <= 0}
             >
               {stockOutMutation.isPending ? "Memproses..." : "Simpan Transaksi"}
             </Button>
