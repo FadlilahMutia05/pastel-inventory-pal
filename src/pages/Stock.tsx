@@ -111,6 +111,10 @@ export default function Stock() {
   const [quantity, setQuantity] = useState<string>("");
   const [deliveryStatus, setDeliveryStatus] = useState<"received" | "otw">("received");
   
+  // Stok Keluar form - buyer info
+  const [buyerName, setBuyerName] = useState<string>("");
+  const [trackingNumber, setTrackingNumber] = useState<string>("");
+  
   // Tambah Barang Baru form
   const [newProductForm, setNewProductForm] = useState<NewProductFormData>(defaultNewProductForm);
   const [uploading, setUploading] = useState(false);
@@ -292,9 +296,13 @@ export default function Stock() {
     },
   });
 
-  // Remove stock mutation
+  // Remove stock mutation with sales transaction
   const removeStockMutation = useMutation({
-    mutationFn: async ({ productId, qty }: { productId: string; qty: number }) => {
+    mutationFn: async ({ productId, qty, customerName, resi }: { productId: string; qty: number; customerName: string; resi: string }) => {
+      // Get product info
+      const product = products?.find(p => p.id === productId);
+      if (!product) throw new Error("Produk tidak ditemukan");
+
       // Get batches using FIFO
       const { data: batches, error: batchError } = await supabase
         .from("product_batches")
@@ -305,32 +313,89 @@ export default function Stock() {
 
       if (batchError) throw batchError;
 
+      // Check if sufficient stock
+      const totalAvailable = (batches || []).reduce((sum, b) => sum + b.remaining_quantity, 0);
+      if (totalAvailable < qty) {
+        throw new Error("Stok tidak mencukupi");
+      }
+
+      // Calculate totals
+      const subtotal = qty * product.selling_price;
+      
+      // Create sales transaction
+      const { data: transaction, error: transactionError } = await supabase
+        .from("sales_transactions")
+        .insert({
+          transaction_code: `MAO-${Date.now()}`,
+          customer_name: customerName,
+          tracking_number: resi || null,
+          courier: "Manual",
+          subtotal: subtotal,
+          shipping_cost: 0,
+          total_amount: subtotal,
+          total_profit: 0,
+        })
+        .select()
+        .single();
+
+      if (transactionError) throw transactionError;
+
       let remaining = qty;
+      let totalProfit = 0;
+
       for (const batch of batches || []) {
         if (remaining <= 0) break;
 
         const deduct = Math.min(batch.remaining_quantity, remaining);
-        const { error } = await supabase
+        const itemSubtotal = deduct * product.selling_price;
+        const itemProfit = itemSubtotal - (deduct * batch.cost_price);
+        totalProfit += itemProfit;
+
+        // Update batch
+        const { error: updateError } = await supabase
           .from("product_batches")
           .update({ remaining_quantity: batch.remaining_quantity - deduct })
           .eq("id", batch.id);
 
-        if (error) throw error;
+        if (updateError) throw updateError;
+
+        // Create transaction item
+        const { error: itemError } = await supabase
+          .from("transaction_items")
+          .insert({
+            transaction_id: transaction.id,
+            product_id: productId,
+            product_batch_id: batch.id,
+            quantity: deduct,
+            unit_price: product.selling_price,
+            cost_price: batch.cost_price,
+            subtotal: itemSubtotal,
+            profit: itemProfit,
+          });
+
+        if (itemError) throw itemError;
         remaining -= deduct;
       }
 
-      if (remaining > 0) {
-        throw new Error("Stok tidak mencukupi");
-      }
+      // Update transaction with total profit
+      await supabase
+        .from("sales_transactions")
+        .update({ total_profit: totalProfit })
+        .eq("id", transaction.id);
+
+      return transaction;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products-with-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["sales-transactions"] });
       setActiveForm("none");
       setSelectedProductId("");
       setQuantity("");
+      setBuyerName("");
+      setTrackingNumber("");
       toast({
-        title: "Stok berhasil dikurangi",
-        description: "Stok telah dikurangi dari inventory",
+        title: "Stok keluar berhasil",
+        description: "Transaksi penjualan telah disimpan",
       });
     },
     onError: (error: any) => {
@@ -412,10 +477,12 @@ export default function Stock() {
   };
 
   const handleSaveStokKeluar = () => {
-    if (!selectedProductId || !quantity) return;
+    if (!selectedProductId || !quantity || !buyerName) return;
     removeStockMutation.mutate({
       productId: selectedProductId,
       qty: parseInt(quantity),
+      customerName: buyerName,
+      resi: trackingNumber,
     });
   };
 
@@ -430,6 +497,8 @@ export default function Stock() {
     setDeliveryStatus("received");
     setNewProductForm(defaultNewProductForm);
     setStokMasukTab("restock");
+    setBuyerName("");
+    setTrackingNumber("");
   };
 
   const handleFormToggle = (form: ActiveForm) => {
@@ -521,7 +590,7 @@ export default function Stock() {
                     <SelectContent>
                       {products?.map((product) => (
                         <SelectItem key={product.id} value={product.id}>
-                          {product.name} ({product.sku})
+                          {product.name} ({product.sku}) - Stok: {product.totalStock || 0}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -538,10 +607,28 @@ export default function Stock() {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label>Nama Pembeli *</Label>
+                  <Input
+                    placeholder="Nama lengkap pembeli"
+                    value={buyerName}
+                    onChange={(e) => setBuyerName(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>No. Resi (Opsional)</Label>
+                  <Input
+                    placeholder="Masukkan nomor resi"
+                    value={trackingNumber}
+                    onChange={(e) => setTrackingNumber(e.target.value)}
+                  />
+                </div>
+
                 <div className="flex gap-3">
                   <Button
                     onClick={handleSaveStokKeluar}
-                    disabled={removeStockMutation.isPending || !selectedProductId || !quantity}
+                    disabled={removeStockMutation.isPending || !selectedProductId || !quantity || !buyerName}
                     className="flex-1 rounded-full"
                     style={{ background: "hsl(165, 60%, 45%)", color: "white" }}
                   >
