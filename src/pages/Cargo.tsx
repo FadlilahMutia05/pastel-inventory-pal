@@ -66,6 +66,8 @@ interface CargoShipment {
 
 interface CargoFormData {
   supplier_id: string;
+  shipping_type: string;
+  courier_name: string;
   tracking_number: string;
   total_value: number;
   shipping_cost: number;
@@ -74,11 +76,20 @@ interface CargoFormData {
 
 const defaultFormData: CargoFormData = {
   supplier_id: "",
+  shipping_type: "cargo",
+  courier_name: "",
   tracking_number: "",
   total_value: 0,
   shipping_cost: 0,
   notes: "",
 };
+
+const SHIPPING_TYPES = [
+  { value: "cargo", label: "Cargo" },
+  { value: "normal", label: "Normal" },
+  { value: "sameday", label: "Same Day" },
+  { value: "instant", label: "Instant" },
+];
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
   ordered: { label: "Ordered", icon: <Clock className="w-4 h-4" />, color: "bg-sky-light text-sky-foreground" },
@@ -134,6 +145,8 @@ export default function Cargo() {
           .from("cargo_shipments")
           .update({
             supplier_id: data.supplier_id || null,
+            shipping_type: data.shipping_type,
+            courier_name: data.courier_name || null,
             tracking_number: data.tracking_number || null,
             total_value: data.total_value,
             shipping_cost: data.shipping_cost || null,
@@ -144,6 +157,8 @@ export default function Cargo() {
       } else {
         const { error } = await supabase.from("cargo_shipments").insert({
           supplier_id: data.supplier_id || null,
+          shipping_type: data.shipping_type,
+          courier_name: data.courier_name || null,
           tracking_number: data.tracking_number || null,
           total_value: data.total_value,
           shipping_cost: data.shipping_cost || null,
@@ -239,6 +254,8 @@ export default function Cargo() {
     setEditingCargo(cargo);
     setFormData({
       supplier_id: cargo.supplier_id || "",
+      shipping_type: (cargo as any).shipping_type || "cargo",
+      courier_name: (cargo as any).courier_name || "",
       tracking_number: cargo.tracking_number || "",
       total_value: cargo.total_value,
       shipping_cost: cargo.shipping_cost || 0,
@@ -310,6 +327,36 @@ export default function Cargo() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Tipe Ekspedisi</Label>
+                  <Select
+                    value={formData.shipping_type}
+                    onValueChange={(v) => setFormData((prev) => ({ ...prev, shipping_type: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih tipe ekspedisi" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SHIPPING_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Nama Ekspedisi</Label>
+                  <Input
+                    value={formData.courier_name}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, courier_name: e.target.value }))
+                    }
+                    placeholder="Contoh: JNE, SiCepat, J&T"
+                  />
                 </div>
 
                 <div className="space-y-2">

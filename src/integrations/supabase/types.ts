@@ -59,6 +59,7 @@ export type Database = {
       cargo_shipments: {
         Row: {
           arrived_date: string | null
+          courier_name: string | null
           created_at: string
           customs_date: string | null
           id: string
@@ -67,6 +68,7 @@ export type Database = {
           received_date: string | null
           shipped_date: string | null
           shipping_cost: number | null
+          shipping_type: string
           status: string
           supplier_id: string | null
           total_value: number
@@ -75,6 +77,7 @@ export type Database = {
         }
         Insert: {
           arrived_date?: string | null
+          courier_name?: string | null
           created_at?: string
           customs_date?: string | null
           id?: string
@@ -83,6 +86,7 @@ export type Database = {
           received_date?: string | null
           shipped_date?: string | null
           shipping_cost?: number | null
+          shipping_type?: string
           status?: string
           supplier_id?: string | null
           total_value?: number
@@ -91,6 +95,7 @@ export type Database = {
         }
         Update: {
           arrived_date?: string | null
+          courier_name?: string | null
           created_at?: string
           customs_date?: string | null
           id?: string
@@ -99,6 +104,7 @@ export type Database = {
           received_date?: string | null
           shipped_date?: string | null
           shipping_cost?: number | null
+          shipping_type?: string
           status?: string
           supplier_id?: string | null
           total_value?: number
