@@ -8,7 +8,9 @@ import {
   Receipt,
   BarChart3,
   Users,
+  Settings,
 } from "lucide-react";
+import { useStoreSettings } from "@/hooks/use-store-settings";
 
 const navItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -18,10 +20,17 @@ const navItems = [
   { path: "/transactions", label: "Transaksi", icon: Receipt },
   { path: "/reports", label: "Laporan", icon: BarChart3 },
   { path: "/suppliers", label: "Supplier", icon: Users },
+  { path: "/settings", label: "Pengaturan", icon: Settings },
 ];
 
 export default function Sidebar() {
   const location = useLocation();
+  const { data: settings } = useStoreSettings();
+
+  const storeName = settings?.store_name || "Mao~Mao Store";
+  const tagline = settings?.tagline || "Blindbox Manager";
+  const logoUrl = settings?.logo_url;
+  const logoEmoji = settings?.logo_emoji || "🎁";
 
   return (
     <aside className="fixed left-0 top-16 bottom-0 w-64 bg-sidebar border-r border-sidebar-border overflow-y-auto">
@@ -51,12 +60,16 @@ export default function Sidebar() {
       {/* Bottom branding */}
       <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white shadow-soft flex items-center justify-center">
-            <span className="text-xl">🎁</span>
+          <div className="w-10 h-10 rounded-xl bg-white shadow-soft flex items-center justify-center overflow-hidden">
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-xl">{logoEmoji}</span>
+            )}
           </div>
           <div>
-            <p className="font-display font-bold text-sm">Mao~Mao Store</p>
-            <p className="text-xs text-muted-foreground">Blindbox Manager</p>
+            <p className="font-display font-bold text-sm">{storeName}</p>
+            <p className="text-xs text-muted-foreground">{tagline}</p>
           </div>
         </div>
       </div>
