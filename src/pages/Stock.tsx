@@ -49,6 +49,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Product {
   id: string;
@@ -63,6 +64,11 @@ interface Product {
   low_stock_threshold: number;
   is_active: boolean;
   totalStock?: number;
+}
+
+interface CartItem {
+  product: Product;
+  quantity: number;
 }
 
 interface NewProductFormData {
@@ -98,6 +104,8 @@ const defaultNewProductForm: NewProductFormData = {
 type ActiveForm = "none" | "stok-masuk" | "stok-keluar" | "tambah-barang";
 type StokMasukTab = "restock" | "new";
 
+const COURIERS = ["JNE", "SiCepat", "J&T", "AnterAja", "Ninja", "ID Express", "Pos Indonesia", "Manual"];
+
 export default function Stock() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -111,9 +119,15 @@ export default function Stock() {
   const [quantity, setQuantity] = useState<string>("");
   const [deliveryStatus, setDeliveryStatus] = useState<"received" | "otw">("received");
   
-  // Stok Keluar form - buyer info
+  // Stok Keluar form - buyer info & cart
+  const [stokKeluarCart, setStokKeluarCart] = useState<CartItem[]>([]);
   const [buyerName, setBuyerName] = useState<string>("");
+  const [buyerPhone, setBuyerPhone] = useState<string>("");
+  const [buyerCity, setBuyerCity] = useState<string>("");
+  const [buyerAddress, setBuyerAddress] = useState<string>("");
+  const [courier, setCourier] = useState<string>("JNE");
   const [trackingNumber, setTrackingNumber] = useState<string>("");
+  const [productSearchKeluar, setProductSearchKeluar] = useState<string>("");
   
   // Tambah Barang Baru form
   const [newProductForm, setNewProductForm] = useState<NewProductFormData>(defaultNewProductForm);
@@ -296,31 +310,29 @@ export default function Stock() {
     },
   });
 
-  // Remove stock mutation with sales transaction
+  // Remove stock mutation with sales transaction - supports multiple products
   const removeStockMutation = useMutation({
-    mutationFn: async ({ productId, qty, customerName, resi }: { productId: string; qty: number; customerName: string; resi: string }) => {
-      // Get product info
-      const product = products?.find(p => p.id === productId);
-      if (!product) throw new Error("Produk tidak ditemukan");
-
-      // Get batches using FIFO
-      const { data: batches, error: batchError } = await supabase
-        .from("product_batches")
-        .select("*")
-        .eq("product_id", productId)
-        .gt("remaining_quantity", 0)
-        .order("received_at", { ascending: true });
-
-      if (batchError) throw batchError;
-
-      // Check if sufficient stock
-      const totalAvailable = (batches || []).reduce((sum, b) => sum + b.remaining_quantity, 0);
-      if (totalAvailable < qty) {
-        throw new Error("Stok tidak mencukupi");
-      }
-
-      // Calculate totals
-      const subtotal = qty * product.selling_price;
+    mutationFn: async ({ 
+      cart, 
+      customerName, 
+      customerPhone,
+      customerCity,
+      customerAddress,
+      courierName,
+      resi 
+    }: { 
+      cart: CartItem[]; 
+      customerName: string; 
+      customerPhone: string;
+      customerCity: string;
+      customerAddress: string;
+      courierName: string;
+      resi: string;
+    }) => {
+      if (cart.length === 0) throw new Error("Keranjang kosong");
+      
+      // Calculate subtotal
+      const subtotal = cart.reduce((sum, item) => sum + item.product.selling_price * item.quantity, 0);
       
       // Create sales transaction
       const { data: transaction, error: transactionError } = await supabase
@@ -328,8 +340,11 @@ export default function Stock() {
         .insert({
           transaction_code: `MAO-${Date.now()}`,
           customer_name: customerName,
+          customer_phone: customerPhone || null,
+          customer_city: customerCity || null,
+          customer_address: customerAddress || null,
+          courier: courierName,
           tracking_number: resi || null,
-          courier: "Manual",
           subtotal: subtotal,
           shipping_cost: 0,
           total_amount: subtotal,
@@ -340,41 +355,61 @@ export default function Stock() {
 
       if (transactionError) throw transactionError;
 
-      let remaining = qty;
       let totalProfit = 0;
 
-      for (const batch of batches || []) {
-        if (remaining <= 0) break;
-
-        const deduct = Math.min(batch.remaining_quantity, remaining);
-        const itemSubtotal = deduct * product.selling_price;
-        const itemProfit = itemSubtotal - (deduct * batch.cost_price);
-        totalProfit += itemProfit;
-
-        // Update batch
-        const { error: updateError } = await supabase
+      // Process each cart item with FIFO
+      for (const item of cart) {
+        let remainingQty = item.quantity;
+        
+        // Get batches using FIFO
+        const { data: batches, error: batchError } = await supabase
           .from("product_batches")
-          .update({ remaining_quantity: batch.remaining_quantity - deduct })
-          .eq("id", batch.id);
+          .select("*")
+          .eq("product_id", item.product.id)
+          .gt("remaining_quantity", 0)
+          .order("received_at", { ascending: true });
 
-        if (updateError) throw updateError;
+        if (batchError) throw batchError;
 
-        // Create transaction item
-        const { error: itemError } = await supabase
-          .from("transaction_items")
-          .insert({
-            transaction_id: transaction.id,
-            product_id: productId,
-            product_batch_id: batch.id,
-            quantity: deduct,
-            unit_price: product.selling_price,
-            cost_price: batch.cost_price,
-            subtotal: itemSubtotal,
-            profit: itemProfit,
-          });
+        // Check if sufficient stock
+        const totalAvailable = (batches || []).reduce((sum, b) => sum + b.remaining_quantity, 0);
+        if (totalAvailable < item.quantity) {
+          throw new Error(`Stok ${item.product.name} tidak mencukupi (tersedia: ${totalAvailable})`);
+        }
 
-        if (itemError) throw itemError;
-        remaining -= deduct;
+        for (const batch of batches || []) {
+          if (remainingQty <= 0) break;
+
+          const deduct = Math.min(batch.remaining_quantity, remainingQty);
+          const itemSubtotal = deduct * item.product.selling_price;
+          const itemProfit = itemSubtotal - (deduct * batch.cost_price);
+          totalProfit += itemProfit;
+
+          // Update batch
+          const { error: updateError } = await supabase
+            .from("product_batches")
+            .update({ remaining_quantity: batch.remaining_quantity - deduct })
+            .eq("id", batch.id);
+
+          if (updateError) throw updateError;
+
+          // Create transaction item
+          const { error: itemError } = await supabase
+            .from("transaction_items")
+            .insert({
+              transaction_id: transaction.id,
+              product_id: item.product.id,
+              product_batch_id: batch.id,
+              quantity: deduct,
+              unit_price: item.product.selling_price,
+              cost_price: batch.cost_price,
+              subtotal: itemSubtotal,
+              profit: itemProfit,
+            });
+
+          if (itemError) throw itemError;
+          remainingQty -= deduct;
+        }
       }
 
       // Update transaction with total profit
@@ -389,10 +424,7 @@ export default function Stock() {
       queryClient.invalidateQueries({ queryKey: ["products-with-stock"] });
       queryClient.invalidateQueries({ queryKey: ["sales-transactions"] });
       setActiveForm("none");
-      setSelectedProductId("");
-      setQuantity("");
-      setBuyerName("");
-      setTrackingNumber("");
+      resetStokKeluarForm();
       toast({
         title: "Stok keluar berhasil",
         description: "Transaksi penjualan telah disimpan",
@@ -406,6 +438,78 @@ export default function Stock() {
       });
     },
   });
+
+  // Reset stok keluar form
+  const resetStokKeluarForm = () => {
+    setStokKeluarCart([]);
+    setBuyerName("");
+    setBuyerPhone("");
+    setBuyerCity("");
+    setBuyerAddress("");
+    setCourier("JNE");
+    setTrackingNumber("");
+    setProductSearchKeluar("");
+  };
+
+  // Add product to stok keluar cart
+  const addToStokKeluarCart = (product: Product) => {
+    setStokKeluarCart((prev) => {
+      const existing = prev.find((item) => item.product.id === product.id);
+      if (existing) {
+        if (existing.quantity >= (product.totalStock || 0)) {
+          toast({
+            title: "Stok tidak cukup",
+            description: `Stok tersedia: ${product.totalStock} pcs`,
+            variant: "destructive",
+          });
+          return prev;
+        }
+        return prev.map((item) =>
+          item.product.id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [...prev, { product, quantity: 1 }];
+    });
+    setProductSearchKeluar("");
+  };
+
+  // Update cart item quantity
+  const updateCartQuantity = (productId: string, delta: number) => {
+    setStokKeluarCart((prev) =>
+      prev
+        .map((item) => {
+          if (item.product.id === productId) {
+            const newQty = item.quantity + delta;
+            if (newQty > (item.product.totalStock || 0)) {
+              toast({
+                title: "Stok tidak cukup",
+                description: `Stok tersedia: ${item.product.totalStock} pcs`,
+                variant: "destructive",
+              });
+              return item;
+            }
+            return { ...item, quantity: newQty };
+          }
+          return item;
+        })
+        .filter((item) => item.quantity > 0)
+    );
+  };
+
+  // Remove from cart
+  const removeFromCart = (productId: string) => {
+    setStokKeluarCart((prev) => prev.filter((item) => item.product.id !== productId));
+  };
+
+  // Filter products for stok keluar search
+  const filteredProductsKeluar = products?.filter(
+    (p) =>
+      (p.totalStock || 0) > 0 &&
+      (p.name.toLowerCase().includes(productSearchKeluar.toLowerCase()) ||
+       p.sku.toLowerCase().includes(productSearchKeluar.toLowerCase()))
+  );
 
   // Delete product mutation
   const deleteMutation = useMutation({
@@ -477,11 +581,14 @@ export default function Stock() {
   };
 
   const handleSaveStokKeluar = () => {
-    if (!selectedProductId || !quantity || !buyerName) return;
+    if (stokKeluarCart.length === 0 || !buyerName) return;
     removeStockMutation.mutate({
-      productId: selectedProductId,
-      qty: parseInt(quantity),
+      cart: stokKeluarCart,
       customerName: buyerName,
+      customerPhone: buyerPhone,
+      customerCity: buyerCity,
+      customerAddress: buyerAddress,
+      courierName: courier,
       resi: trackingNumber,
     });
   };
@@ -497,8 +604,7 @@ export default function Stock() {
     setDeliveryStatus("received");
     setNewProductForm(defaultNewProductForm);
     setStokMasukTab("restock");
-    setBuyerName("");
-    setTrackingNumber("");
+    resetStokKeluarForm();
   };
 
   const handleFormToggle = (form: ActiveForm) => {
@@ -578,61 +684,193 @@ export default function Stock() {
           >
             <Card className="glass-card">
               <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold">Stok Keluar</CardTitle>
+                <CardTitle className="text-lg font-semibold">Stok Keluar / Penjualan Manual</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Product Search & Add */}
                 <div className="space-y-2">
-                  <Label>Pilih Produk</Label>
-                  <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih produk..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {products?.map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name} ({product.sku}) - Stok: {product.totalStock || 0}
-                        </SelectItem>
+                  <Label>Cari & Tambah Produk</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Cari produk..."
+                      value={productSearchKeluar}
+                      onChange={(e) => setProductSearchKeluar(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  {productSearchKeluar && filteredProductsKeluar && filteredProductsKeluar.length > 0 && (
+                    <div className="border rounded-lg max-h-40 overflow-y-auto bg-background">
+                      {filteredProductsKeluar.slice(0, 5).map((product) => (
+                        <button
+                          key={product.id}
+                          onClick={() => addToStokKeluarCart(product)}
+                          className="w-full flex items-center justify-between p-2 hover:bg-muted text-left"
+                        >
+                          <div className="flex items-center gap-2">
+                            {product.photo_url ? (
+                              <img src={product.photo_url} alt="" className="w-8 h-8 rounded object-cover" />
+                            ) : (
+                              <div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
+                                <Package className="w-4 h-4 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div>
+                              <p className="text-sm font-medium">{product.name}</p>
+                              <p className="text-xs text-muted-foreground">{product.sku}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium">{formatCurrency(product.selling_price)}</p>
+                            <Badge variant="secondary" className="text-xs">Stok: {product.totalStock}</Badge>
+                          </div>
+                        </button>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Jumlah</Label>
-                  <Input
-                    type="number"
-                    placeholder="Masukkan jumlah"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                  />
+                {/* Cart Items */}
+                {stokKeluarCart.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Produk Dipilih ({stokKeluarCart.length})</Label>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {stokKeluarCart.map((item) => (
+                        <div
+                          key={item.product.id}
+                          className="flex items-center justify-between gap-2 p-2 rounded-lg bg-muted/50"
+                        >
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            {item.product.photo_url ? (
+                              <img src={item.product.photo_url} alt="" className="w-10 h-10 rounded object-cover" />
+                            ) : (
+                              <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                                <Package className="w-5 h-5 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm truncate">{item.product.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatCurrency(item.product.selling_price)} × {item.quantity} = {formatCurrency(item.product.selling_price * item.quantity)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => updateCartQuantity(item.product.id, -1)}
+                            >
+                              <Minus className="w-3 h-3" />
+                            </Button>
+                            <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => updateCartQuantity(item.product.id, 1)}
+                            >
+                              <Plus className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive"
+                              onClick={() => removeFromCart(item.product.id)}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-between pt-2 border-t font-medium">
+                      <span>Total</span>
+                      <span className="text-primary">
+                        {formatCurrency(stokKeluarCart.reduce((sum, item) => sum + item.product.selling_price * item.quantity, 0))}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Customer Info */}
+                <div className="space-y-3 pt-4 border-t">
+                  <Label className="text-base font-semibold">Informasi Pembeli</Label>
+                  
+                  <div className="space-y-2">
+                    <Label>Nama Pembeli *</Label>
+                    <Input
+                      placeholder="Nama lengkap pembeli"
+                      value={buyerName}
+                      onChange={(e) => setBuyerName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>No. HP</Label>
+                      <Input
+                        placeholder="08xxxxxxxxxx"
+                        value={buyerPhone}
+                        onChange={(e) => setBuyerPhone(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Kota</Label>
+                      <Input
+                        placeholder="Kota tujuan"
+                        value={buyerCity}
+                        onChange={(e) => setBuyerCity(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Alamat Lengkap</Label>
+                    <Textarea
+                      placeholder="Alamat lengkap pembeli..."
+                      value={buyerAddress}
+                      onChange={(e) => setBuyerAddress(e.target.value)}
+                      rows={2}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Ekspedisi</Label>
+                      <Select value={courier} onValueChange={setCourier}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COURIERS.map((c) => (
+                            <SelectItem key={c} value={c}>
+                              {c}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>No. Resi</Label>
+                      <Input
+                        placeholder="Opsional"
+                        value={trackingNumber}
+                        onChange={(e) => setTrackingNumber(e.target.value)}
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Nama Pembeli *</Label>
-                  <Input
-                    placeholder="Nama lengkap pembeli"
-                    value={buyerName}
-                    onChange={(e) => setBuyerName(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>No. Resi (Opsional)</Label>
-                  <Input
-                    placeholder="Masukkan nomor resi"
-                    value={trackingNumber}
-                    onChange={(e) => setTrackingNumber(e.target.value)}
-                  />
-                </div>
-
-                <div className="flex gap-3">
+                <div className="flex gap-3 pt-2">
                   <Button
                     onClick={handleSaveStokKeluar}
-                    disabled={removeStockMutation.isPending || !selectedProductId || !quantity || !buyerName}
+                    disabled={removeStockMutation.isPending || stokKeluarCart.length === 0 || !buyerName}
                     className="flex-1 rounded-full"
                     style={{ background: "hsl(165, 60%, 45%)", color: "white" }}
                   >
-                    {removeStockMutation.isPending ? "Menyimpan..." : "Simpan"}
+                    {removeStockMutation.isPending ? "Menyimpan..." : "Simpan Transaksi"}
                   </Button>
                   <Button
                     variant="outline"
