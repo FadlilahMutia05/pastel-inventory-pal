@@ -8,20 +8,20 @@ import {
   Search,
   Package,
   TrendingUp,
-  TrendingDown,
   DollarSign,
   AlertTriangle,
   CheckCircle,
   XCircle,
-  BarChart3,
   Plus,
   Minus,
+  Layers,
 } from "lucide-react";
 import { StockInDialog } from "@/components/products/StockInDialog";
 import { StockOutDialog } from "@/components/products/StockOutDialog";
+import { ManageBatchesDialog } from "@/components/products/ManageBatchesDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -67,7 +67,7 @@ export default function Stock() {
   // Stock dialogs state
   const [stockInProduct, setStockInProduct] = useState<ProductStock | null>(null);
   const [stockOutProduct, setStockOutProduct] = useState<ProductStock | null>(null);
-
+  const [manageBatchesProduct, setManageBatchesProduct] = useState<ProductStock | null>(null);
   // Query products with stock and value calculations
   const { data: products, isLoading } = useQuery({
     queryKey: ["products-stock-monitoring"],
@@ -457,6 +457,7 @@ export default function Stock() {
                               variant="ghost"
                               className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
                               onClick={() => setStockInProduct(product)}
+                              title="Stok Masuk"
                             >
                               <Plus className="w-4 h-4" />
                             </Button>
@@ -466,8 +467,18 @@ export default function Stock() {
                               className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
                               onClick={() => setStockOutProduct(product)}
                               disabled={product.totalStock === 0}
+                              title="Stok Keluar"
                             >
                               <Minus className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-primary hover:text-primary hover:bg-primary/10"
+                              onClick={() => setManageBatchesProduct(product)}
+                              title="Kelola Batch"
+                            >
+                              <Layers className="w-4 h-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -491,6 +502,11 @@ export default function Stock() {
         product={stockOutProduct}
         open={!!stockOutProduct}
         onOpenChange={(open) => !open && setStockOutProduct(null)}
+      />
+      <ManageBatchesDialog
+        product={manageBatchesProduct}
+        open={!!manageBatchesProduct}
+        onOpenChange={(open) => !open && setManageBatchesProduct(null)}
       />
     </AppLayout>
   );
