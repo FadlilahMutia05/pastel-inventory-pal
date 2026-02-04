@@ -15,6 +15,7 @@ import {
   Clock,
   XCircle,
   Calendar,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +33,19 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   Table,
@@ -84,6 +97,7 @@ export default function Transactions() {
   const [dateFilter, setDateFilter] = useState<string>("");
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [deleteTransaction, setDeleteTransaction] = useState<Transaction | null>(null);
 
   // Query transactions
   const { data: transactions, isLoading } = useQuery({
@@ -144,6 +158,62 @@ export default function Transactions() {
       toast({
         title: "Status diperbarui",
         description: "Status transaksi berhasil diubah",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete transaction mutation
+  const deleteTransactionMutation = useMutation({
+    mutationFn: async (transaction: Transaction) => {
+      // First get the transaction items to restore stock
+      const { data: items, error: itemsError } = await supabase
+        .from("transaction_items")
+        .select("*, product_batches(id, remaining_quantity)")
+        .eq("transaction_id", transaction.id);
+
+      if (itemsError) throw itemsError;
+
+      // Restore stock to batches (FIFO reverse)
+      for (const item of items || []) {
+        if (item.product_batch_id) {
+          const currentQty = item.product_batches?.remaining_quantity || 0;
+          await supabase
+            .from("product_batches")
+            .update({ remaining_quantity: currentQty + item.quantity })
+            .eq("id", item.product_batch_id);
+        }
+      }
+
+      // Delete transaction items first (foreign key constraint)
+      const { error: deleteItemsError } = await supabase
+        .from("transaction_items")
+        .delete()
+        .eq("transaction_id", transaction.id);
+
+      if (deleteItemsError) throw deleteItemsError;
+
+      // Then delete the transaction
+      const { error: deleteError } = await supabase
+        .from("sales_transactions")
+        .delete()
+        .eq("id", transaction.id);
+
+      if (deleteError) throw deleteError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sales-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["products-with-stock"] });
+      setDeleteTransaction(null);
+      toast({
+        title: "Transaksi dihapus",
+        description: "Transaksi berhasil dihapus dan stok dikembalikan",
       });
     },
     onError: (error: any) => {
@@ -389,21 +459,31 @@ export default function Transactions() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            {nextStatus && (
+                            <div className="flex items-center justify-end gap-2">
+                              {nextStatus && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    updateStatusMutation.mutate({
+                                      id: transaction.id,
+                                      status: nextStatus,
+                                    })
+                                  }
+                                  disabled={updateStatusMutation.isPending}
+                                >
+                                  {STATUS_CONFIG[nextStatus].label}
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  updateStatusMutation.mutate({
-                                    id: transaction.id,
-                                    status: nextStatus,
-                                  })
-                                }
-                                disabled={updateStatusMutation.isPending}
+                                variant="ghost"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => setDeleteTransaction(transaction)}
                               >
-                                {STATUS_CONFIG[nextStatus].label}
+                                <Trash2 className="w-4 h-4" />
                               </Button>
-                            )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -507,6 +587,46 @@ export default function Transactions() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteTransaction} onOpenChange={() => setDeleteTransaction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Transaksi?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Anda yakin ingin menghapus transaksi{" "}
+                <span className="font-mono font-semibold text-foreground">
+                  {deleteTransaction?.transaction_code}
+                </span>
+                ?
+              </p>
+              <p className="text-sm">
+                Pelanggan: <span className="font-medium">{deleteTransaction?.customer_name}</span>
+              </p>
+              <p className="text-sm">
+                Total: <span className="font-medium">{formatCurrency(deleteTransaction?.total_amount || 0)}</span>
+              </p>
+              <p className="text-sm">
+                Profit: <span className="font-medium text-success-foreground">{formatCurrency(deleteTransaction?.total_profit || 0)}</span>
+              </p>
+              <p className="mt-3 text-warning-foreground text-sm font-medium">
+                ⚠️ Stok produk akan dikembalikan secara otomatis.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTransaction && deleteTransactionMutation.mutate(deleteTransaction)}
+              disabled={deleteTransactionMutation.isPending}
+            >
+              {deleteTransactionMutation.isPending ? "Menghapus..." : "Hapus Transaksi"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
