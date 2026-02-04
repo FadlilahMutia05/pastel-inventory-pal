@@ -9,6 +9,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/format";
+import { useStoreSettings } from "@/hooks/use-store-settings";
 
 interface HeaderProps {
   title: string;
@@ -71,14 +72,22 @@ export default function Header({ title }: HeaderProps) {
   });
 
   const lowStockCount = lowStockProducts?.length || 0;
+  const { data: settings } = useStoreSettings();
+
+  const logoUrl = settings?.logo_url;
+  const logoEmoji = settings?.logo_emoji || "🎁";
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-lavender-light border-b border-border backdrop-blur-lg bg-opacity-90">
       <div className="h-full flex items-center justify-between px-4 md:px-6">
         {/* Left - Logo & Title */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white shadow-soft flex items-center justify-center">
-            <span className="text-2xl">🎁</span>
+          <div className="w-10 h-10 rounded-xl bg-white shadow-soft flex items-center justify-center overflow-hidden">
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-2xl">{logoEmoji}</span>
+            )}
           </div>
           <div className="hidden sm:block">
             <h1 className="font-display font-bold text-lg text-foreground">

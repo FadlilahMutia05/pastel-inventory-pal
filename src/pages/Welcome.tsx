@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Sparkles, Package, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useStoreSettings } from "@/hooks/use-store-settings";
 
 const Sparkle = ({ delay, x, y }: { delay: number; x: string; y: string }) => (
   <motion.div
@@ -48,6 +49,12 @@ const FloatingBox = ({ delay, x, size }: { delay: number; x: string; size: strin
 export default function Welcome() {
   const navigate = useNavigate();
   const [isLoaded, setIsLoaded] = useState(false);
+  const { data: settings } = useStoreSettings();
+
+  const storeName = settings?.store_name || "Mao~Mao Store";
+  const tagline = settings?.tagline || "Kelola bisnis blindbox Anda dengan mudah dan indah ✨";
+  const logoUrl = settings?.logo_url;
+  const logoEmoji = settings?.logo_emoji || "🎁";
 
   useEffect(() => {
     setIsLoaded(true);
@@ -97,8 +104,12 @@ export default function Welcome() {
             transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
           >
             <div className="relative">
-              <div className="w-24 h-24 md:w-32 md:h-32 rounded-3xl bg-white/90 shadow-card flex items-center justify-center">
-                <span className="text-5xl md:text-6xl">🎁</span>
+              <div className="w-24 h-24 md:w-32 md:h-32 rounded-3xl bg-white/90 shadow-card flex items-center justify-center overflow-hidden">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-5xl md:text-6xl">{logoEmoji}</span>
+                )}
               </div>
               <motion.div
                 className="absolute -top-2 -right-2"
@@ -118,10 +129,10 @@ export default function Welcome() {
             transition={{ delay: 0.3, duration: 0.8 }}
           >
             <span className="bg-gradient-to-r from-pink to-lavender bg-clip-text text-transparent">
-              Mao~Mao
+              {storeName.split(" ")[0]}
             </span>
             <br />
-            <span className="text-foreground/90">Store</span>
+            <span className="text-foreground/90">{storeName.split(" ").slice(1).join(" ") || "Store"}</span>
           </motion.h1>
 
           {/* Tagline */}
@@ -131,7 +142,7 @@ export default function Welcome() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5, duration: 0.8 }}
           >
-            Kelola bisnis blindbox Anda dengan mudah dan indah ✨
+            {tagline} ✨
           </motion.p>
 
           {/* Enter button */}

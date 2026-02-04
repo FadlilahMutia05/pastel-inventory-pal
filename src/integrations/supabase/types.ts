@@ -302,6 +302,36 @@ export type Database = {
         }
         Relationships: []
       }
+      store_settings: {
+        Row: {
+          created_at: string
+          id: string
+          logo_emoji: string | null
+          logo_url: string | null
+          store_name: string
+          tagline: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          logo_emoji?: string | null
+          logo_url?: string | null
+          store_name?: string
+          tagline?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          logo_emoji?: string | null
+          logo_url?: string | null
+          store_name?: string
+          tagline?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       suppliers: {
         Row: {
           address: string | null
