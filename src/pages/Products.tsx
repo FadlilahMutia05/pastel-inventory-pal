@@ -14,6 +14,8 @@ import {
   Link as LinkIcon,
   X,
   Save,
+  ArrowDownCircle,
+  ArrowUpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +48,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { StockInDialog } from "@/components/products/StockInDialog";
+import { StockOutDialog } from "@/components/products/StockOutDialog";
 
 const PRODUCT_TYPES = [
   { value: "Blindbox", label: "Blind Box" },
@@ -94,6 +98,10 @@ export default function Products() {
   const [imageTab, setImageTab] = useState<"url" | "upload">("url");
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Stock dialogs
+  const [stockInProduct, setStockInProduct] = useState<any>(null);
+  const [stockOutProduct, setStockOutProduct] = useState<any>(null);
 
   // Query products with stock
   const { data: products, isLoading } = useQuery({
@@ -377,23 +385,58 @@ export default function Products() {
                       </div>
                     )}
                     {/* Hover Actions */}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        className="h-8 w-8"
-                        onClick={() => openEditDialog(product)}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="destructive"
-                        className="h-8 w-8"
-                        onClick={() => setDeleteProductId(product.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setStockInProduct(product);
+                          }}
+                        >
+                          <ArrowDownCircle className="w-3 h-3" />
+                          Masuk
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setStockOutProduct(product);
+                          }}
+                          disabled={product.totalStock <= 0}
+                        >
+                          <ArrowUpCircle className="w-3 h-3" />
+                          Keluar
+                        </Button>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="icon"
+                          variant="secondary"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditDialog(product);
+                          }}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="destructive"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteProductId(product.id);
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
 
@@ -718,6 +761,20 @@ export default function Products() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Stock In Dialog */}
+      <StockInDialog
+        product={stockInProduct}
+        open={!!stockInProduct}
+        onOpenChange={(open) => !open && setStockInProduct(null)}
+      />
+
+      {/* Stock Out Dialog */}
+      <StockOutDialog
+        product={stockOutProduct}
+        open={!!stockOutProduct}
+        onOpenChange={(open) => !open && setStockOutProduct(null)}
+      />
     </AppLayout>
   );
 }
