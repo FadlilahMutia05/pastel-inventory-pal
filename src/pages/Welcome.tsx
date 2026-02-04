@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Sparkles, Package, ArrowRight } from "lucide-react";
+import { Sparkles, Package, ArrowRight, BarChart3, ShoppingCart, Truck, Box } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStoreSettings } from "@/hooks/use-store-settings";
 
@@ -46,6 +46,32 @@ const FloatingBox = ({ delay, x, size }: { delay: number; x: string; size: strin
   </motion.div>
 );
 
+const FeatureCard = ({ 
+  icon: Icon, 
+  title, 
+  description, 
+  delay 
+}: { 
+  icon: React.ElementType; 
+  title: string; 
+  description: string; 
+  delay: number;
+}) => (
+  <motion.div
+    className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 md:p-6 shadow-soft border border-white/50"
+    initial={{ opacity: 0, y: 30 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay, duration: 0.6 }}
+    whileHover={{ scale: 1.02, y: -5 }}
+  >
+    <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center mb-3">
+      <Icon className="w-6 h-6 text-white" />
+    </div>
+    <h3 className="font-semibold text-foreground mb-1">{title}</h3>
+    <p className="text-sm text-muted-foreground">{description}</p>
+  </motion.div>
+);
+
 export default function Welcome() {
   const navigate = useNavigate();
   const [isLoaded, setIsLoaded] = useState(false);
@@ -63,6 +89,29 @@ export default function Welcome() {
   const handleEnter = () => {
     navigate("/dashboard");
   };
+
+  const features = [
+    {
+      icon: Box,
+      title: "Kelola Stok",
+      description: "Pantau stok realtime dengan sistem FIFO otomatis",
+    },
+    {
+      icon: ShoppingCart,
+      title: "Penjualan Mudah",
+      description: "Catat penjualan dengan kalkulasi profit otomatis",
+    },
+    {
+      icon: Truck,
+      title: "Tracking Kargo",
+      description: "Lacak pengiriman dari supplier hingga tiba",
+    },
+    {
+      icon: BarChart3,
+      title: "Laporan Lengkap",
+      description: "Analisis profit dan performa bisnis Anda",
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-welcome relative overflow-hidden">
@@ -89,88 +138,113 @@ export default function Welcome() {
       </div>
 
       {/* Main content */}
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4">
-        {/* Logo and title */}
-        <motion.div
-          className="text-center"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 30 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-        >
-          {/* Logo icon */}
+      <div className="relative z-10 flex flex-col min-h-screen px-4 py-8 md:py-12">
+        {/* Hero Section */}
+        <div className="flex-1 flex flex-col items-center justify-center">
           <motion.div
-            className="mb-6 inline-flex items-center justify-center"
-            animate={{ y: [0, -10, 0] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            className="text-center"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 30 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
           >
-            <div className="relative">
-              <div className="w-24 h-24 md:w-32 md:h-32 rounded-3xl bg-white/90 shadow-card flex items-center justify-center overflow-hidden">
-                {logoUrl ? (
-                  <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-5xl md:text-6xl">{logoEmoji}</span>
-                )}
+            {/* Logo icon */}
+            <motion.div
+              className="mb-6 inline-flex items-center justify-center"
+              animate={{ y: [0, -10, 0] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <div className="relative">
+                <div className="w-24 h-24 md:w-32 md:h-32 rounded-3xl bg-white/90 shadow-card flex items-center justify-center overflow-hidden">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-5xl md:text-6xl">{logoEmoji}</span>
+                  )}
+                </div>
+                <motion.div
+                  className="absolute -top-2 -right-2"
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  <Sparkles className="w-8 h-8 text-primary" />
+                </motion.div>
               </div>
-              <motion.div
-                className="absolute -top-2 -right-2"
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
+            </motion.div>
+
+            {/* Store name */}
+            <motion.h1
+              className="text-4xl md:text-6xl lg:text-7xl font-display font-bold mb-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.8 }}
+            >
+              <span className="bg-gradient-to-r from-pink to-lavender bg-clip-text text-transparent">
+                {storeName.split(" ")[0]}
+              </span>
+              <br />
+              <span className="text-foreground/90">{storeName.split(" ").slice(1).join(" ") || "Store"}</span>
+            </motion.h1>
+
+            {/* Tagline */}
+            <motion.p
+              className="text-lg md:text-xl text-foreground/70 mb-8 max-w-md mx-auto"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5, duration: 0.8 }}
+            >
+              {tagline}
+            </motion.p>
+
+            {/* Enter button */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7, duration: 0.8 }}
+            >
+              <Button
+                onClick={handleEnter}
+                size="lg"
+                className="group bg-gradient-primary hover:opacity-90 text-white font-semibold px-8 py-6 text-lg rounded-2xl shadow-glow animate-pulse-glow transition-all duration-300 hover:scale-105"
               >
-                <Sparkles className="w-8 h-8 text-primary" />
-              </motion.div>
-            </div>
+                Masuk ke Dashboard
+                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </motion.div>
           </motion.div>
+        </div>
 
-          {/* Store name */}
-          <motion.h1
-            className="text-4xl md:text-6xl lg:text-7xl font-display font-bold mb-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.8 }}
-          >
-            <span className="bg-gradient-to-r from-pink to-lavender bg-clip-text text-transparent">
-              {storeName.split(" ")[0]}
-            </span>
-            <br />
-            <span className="text-foreground/90">{storeName.split(" ").slice(1).join(" ") || "Store"}</span>
-          </motion.h1>
-
-          {/* Tagline */}
-          <motion.p
-            className="text-lg md:text-xl text-foreground/70 mb-8 max-w-md mx-auto"
+        {/* Features Section */}
+        <div className="w-full max-w-4xl mx-auto mt-8 md:mt-12">
+          <motion.h2
+            className="text-center text-lg md:text-xl font-semibold text-foreground/80 mb-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.5, duration: 0.8 }}
+            transition={{ delay: 0.9, duration: 0.6 }}
           >
-            {tagline} ✨
-          </motion.p>
-
-          {/* Enter button */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7, duration: 0.8 }}
-          >
-            <Button
-              onClick={handleEnter}
-              size="lg"
-              className="group bg-gradient-primary hover:opacity-90 text-white font-semibold px-8 py-6 text-lg rounded-2xl shadow-glow animate-pulse-glow transition-all duration-300 hover:scale-105"
-            >
-              Masuk ke Dashboard
-              <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </Button>
-          </motion.div>
-        </motion.div>
+            Fitur Unggulan ✨
+          </motion.h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+            {features.map((feature, index) => (
+              <FeatureCard
+                key={feature.title}
+                icon={feature.icon}
+                title={feature.title}
+                description={feature.description}
+                delay={1 + index * 0.15}
+              />
+            ))}
+          </div>
+        </div>
 
         {/* Bottom decorative element */}
         <motion.div
-          className="absolute bottom-8 left-1/2 -translate-x-1/2"
+          className="text-center mt-8"
           initial={{ opacity: 0 }}
           animate={{ opacity: 0.5 }}
-          transition={{ delay: 1, duration: 1 }}
+          transition={{ delay: 1.6, duration: 1 }}
         >
           <p className="text-sm text-foreground/40">
-            Blindbox Manager System
+            Blindbox Manager System v1.0
           </p>
         </motion.div>
       </div>
