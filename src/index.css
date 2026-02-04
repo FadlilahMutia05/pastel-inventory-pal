@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* =============================================
-   Mao Mao Store - Pastel Multi-Color Design System
+   Mao~Mao Store - Pastel Multi-Color Design System
    ============================================= */
 
 @layer base {
@@ -164,7 +164,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: "Inter", "Nunito", system-ui, sans-serif;
+    font-family: 'Inter', 'Nunito', system-ui, sans-serif;
   }
 }
 
@@ -251,8 +251,7 @@
 
   /* Sparkle animation */
   @keyframes sparkle {
-    0%,
-    100% {
+    0%, 100% {
       opacity: 0;
       transform: scale(0) rotate(0deg);
     }
@@ -268,8 +267,7 @@
 
   /* Float animation */
   @keyframes float {
-    0%,
-    100% {
+    0%, 100% {
       transform: translateY(0px);
     }
     50% {
@@ -283,8 +281,7 @@
 
   /* Pulse glow animation */
   @keyframes pulse-glow {
-    0%,
-    100% {
+    0%, 100% {
       box-shadow: 0 0 20px hsl(340 80% 70% / 0.3);
     }
     50% {
