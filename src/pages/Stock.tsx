@@ -69,6 +69,8 @@ interface Product {
 interface CartItem {
   product: Product;
   quantity: number;
+  unit: "pcs" | "set";
+  customPrice: number | null; // null means use default price
 }
 
 interface NewProductFormData {
@@ -310,7 +312,7 @@ export default function Stock() {
     },
   });
 
-  // Remove stock mutation with sales transaction - supports multiple products
+  // Remove stock mutation with sales transaction - supports multiple products with units and custom pricing
   const removeStockMutation = useMutation({
     mutationFn: async ({ 
       cart, 
@@ -331,8 +333,22 @@ export default function Stock() {
     }) => {
       if (cart.length === 0) throw new Error("Keranjang kosong");
       
-      // Calculate subtotal
-      const subtotal = cart.reduce((sum, item) => sum + item.product.selling_price * item.quantity, 0);
+      // Helper to get effective price
+      const getItemPrice = (item: CartItem) => {
+        if (item.customPrice !== null) return item.customPrice;
+        if (item.unit === "set") {
+          return item.product.selling_price * item.product.pcs_per_set;
+        }
+        return item.product.selling_price;
+      };
+      
+      // Helper to get pcs equivalent
+      const getItemPcs = (item: CartItem) => {
+        return item.unit === "set" ? item.quantity * item.product.pcs_per_set : item.quantity;
+      };
+      
+      // Calculate subtotal with custom prices
+      const subtotal = cart.reduce((sum, item) => sum + getItemPrice(item) * item.quantity, 0);
       
       // Create sales transaction
       const { data: transaction, error: transactionError } = await supabase
@@ -359,7 +375,9 @@ export default function Stock() {
 
       // Process each cart item with FIFO
       for (const item of cart) {
-        let remainingQty = item.quantity;
+        const pcsToDeduct = getItemPcs(item);
+        const unitPrice = getItemPrice(item) / (item.unit === "set" ? item.product.pcs_per_set : 1); // Price per pcs
+        let remainingQty = pcsToDeduct;
         
         // Get batches using FIFO
         const { data: batches, error: batchError } = await supabase
@@ -373,15 +391,15 @@ export default function Stock() {
 
         // Check if sufficient stock
         const totalAvailable = (batches || []).reduce((sum, b) => sum + b.remaining_quantity, 0);
-        if (totalAvailable < item.quantity) {
-          throw new Error(`Stok ${item.product.name} tidak mencukupi (tersedia: ${totalAvailable})`);
+        if (totalAvailable < pcsToDeduct) {
+          throw new Error(`Stok ${item.product.name} tidak mencukupi (tersedia: ${totalAvailable} pcs, dibutuhkan: ${pcsToDeduct} pcs)`);
         }
 
         for (const batch of batches || []) {
           if (remainingQty <= 0) break;
 
           const deduct = Math.min(batch.remaining_quantity, remainingQty);
-          const itemSubtotal = deduct * item.product.selling_price;
+          const itemSubtotal = deduct * unitPrice;
           const itemProfit = itemSubtotal - (deduct * batch.cost_price);
           totalProfit += itemProfit;
 
@@ -401,7 +419,7 @@ export default function Stock() {
               product_id: item.product.id,
               product_batch_id: batch.id,
               quantity: deduct,
-              unit_price: item.product.selling_price,
+              unit_price: unitPrice,
               cost_price: batch.cost_price,
               subtotal: itemSubtotal,
               profit: itemProfit,
@@ -454,7 +472,7 @@ export default function Stock() {
   // Add product to stok keluar cart
   const addToStokKeluarCart = (product: Product) => {
     setStokKeluarCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
+      const existing = prev.find((item) => item.product.id === product.id && item.unit === "pcs");
       if (existing) {
         if (existing.quantity >= (product.totalStock || 0)) {
           toast({
@@ -465,24 +483,25 @@ export default function Stock() {
           return prev;
         }
         return prev.map((item) =>
-          item.product.id === product.id
+          item.product.id === product.id && item.unit === "pcs"
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
-      return [...prev, { product, quantity: 1 }];
+      return [...prev, { product, quantity: 1, unit: "pcs" as const, customPrice: null }];
     });
     setProductSearchKeluar("");
   };
 
   // Update cart item quantity
-  const updateCartQuantity = (productId: string, delta: number) => {
+  const updateCartQuantity = (productId: string, unit: "pcs" | "set", delta: number) => {
     setStokKeluarCart((prev) =>
       prev
         .map((item) => {
-          if (item.product.id === productId) {
+          if (item.product.id === productId && item.unit === unit) {
             const newQty = item.quantity + delta;
-            if (newQty > (item.product.totalStock || 0)) {
+            const pcsNeeded = unit === "set" ? newQty * item.product.pcs_per_set : newQty;
+            if (pcsNeeded > (item.product.totalStock || 0)) {
               toast({
                 title: "Stok tidak cukup",
                 description: `Stok tersedia: ${item.product.totalStock} pcs`,
@@ -496,6 +515,54 @@ export default function Stock() {
         })
         .filter((item) => item.quantity > 0)
     );
+  };
+
+  // Update cart item unit
+  const updateCartUnit = (productId: string, currentUnit: "pcs" | "set", newUnit: "pcs" | "set") => {
+    setStokKeluarCart((prev) =>
+      prev.map((item) => {
+        if (item.product.id === productId && item.unit === currentUnit) {
+          // Reset quantity to 1 when switching units
+          const pcsNeeded = newUnit === "set" ? item.product.pcs_per_set : 1;
+          if (pcsNeeded > (item.product.totalStock || 0)) {
+            toast({
+              title: "Stok tidak cukup untuk 1 set",
+              description: `Stok tersedia: ${item.product.totalStock} pcs`,
+              variant: "destructive",
+            });
+            return item;
+          }
+          return { ...item, unit: newUnit, quantity: 1 };
+        }
+        return item;
+      })
+    );
+  };
+
+  // Update cart item custom price
+  const updateCartCustomPrice = (productId: string, unit: "pcs" | "set", price: string) => {
+    const numPrice = price === "" ? null : parseFloat(price);
+    setStokKeluarCart((prev) =>
+      prev.map((item) =>
+        item.product.id === productId && item.unit === unit
+          ? { ...item, customPrice: numPrice }
+          : item
+      )
+    );
+  };
+
+  // Get effective price for cart item
+  const getEffectivePrice = (item: CartItem) => {
+    if (item.customPrice !== null) return item.customPrice;
+    if (item.unit === "set") {
+      return item.product.selling_price * item.product.pcs_per_set;
+    }
+    return item.product.selling_price;
+  };
+
+  // Get pcs equivalent for stock deduction
+  const getPcsEquivalent = (item: CartItem) => {
+    return item.unit === "set" ? item.quantity * item.product.pcs_per_set : item.quantity;
   };
 
   // Remove from cart
@@ -734,45 +801,26 @@ export default function Stock() {
                 {stokKeluarCart.length > 0 && (
                   <div className="space-y-2">
                     <Label>Produk Dipilih ({stokKeluarCart.length})</Label>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {stokKeluarCart.map((item) => (
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {stokKeluarCart.map((item, idx) => (
                         <div
-                          key={item.product.id}
-                          className="flex items-center justify-between gap-2 p-2 rounded-lg bg-muted/50"
+                          key={`${item.product.id}-${item.unit}-${idx}`}
+                          className="p-3 rounded-lg bg-muted/50 space-y-2"
                         >
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            {item.product.photo_url ? (
-                              <img src={item.product.photo_url} alt="" className="w-10 h-10 rounded object-cover" />
-                            ) : (
-                              <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
-                                <Package className="w-5 h-5 text-muted-foreground" />
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              {item.product.photo_url ? (
+                                <img src={item.product.photo_url} alt="" className="w-10 h-10 rounded object-cover" />
+                              ) : (
+                                <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                                  <Package className="w-5 h-5 text-muted-foreground" />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="font-medium text-sm truncate">{item.product.name}</p>
+                                <p className="text-xs text-muted-foreground">{item.product.sku}</p>
                               </div>
-                            )}
-                            <div className="min-w-0">
-                              <p className="font-medium text-sm truncate">{item.product.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatCurrency(item.product.selling_price)} × {item.quantity} = {formatCurrency(item.product.selling_price * item.quantity)}
-                              </p>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => updateCartQuantity(item.product.id, -1)}
-                            >
-                              <Minus className="w-3 h-3" />
-                            </Button>
-                            <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => updateCartQuantity(item.product.id, 1)}
-                            >
-                              <Plus className="w-3 h-3" />
-                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -782,13 +830,100 @@ export default function Stock() {
                               <Trash2 className="w-3 h-3" />
                             </Button>
                           </div>
+                          
+                          {/* Unit & Quantity Row */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Select 
+                              value={item.unit} 
+                              onValueChange={(val: "pcs" | "set") => updateCartUnit(item.product.id, item.unit, val)}
+                            >
+                              <SelectTrigger className="w-24 h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pcs">Pcs</SelectItem>
+                                <SelectItem value="set">Set ({item.product.pcs_per_set} pcs)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => updateCartQuantity(item.product.id, item.unit, -1)}
+                              >
+                                <Minus className="w-3 h-3" />
+                              </Button>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const newQty = parseInt(e.target.value) || 0;
+                                  const delta = newQty - item.quantity;
+                                  if (delta !== 0) updateCartQuantity(item.product.id, item.unit, delta);
+                                }}
+                                className="w-16 h-8 text-center text-sm"
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => updateCartQuantity(item.product.id, item.unit, 1)}
+                              >
+                                <Plus className="w-3 h-3" />
+                              </Button>
+                            </div>
+                            
+                            <span className="text-xs text-muted-foreground">
+                              = {getPcsEquivalent(item)} pcs
+                            </span>
+                          </div>
+                          
+                          {/* Price Row */}
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                              <Label className="text-xs text-muted-foreground">Harga per {item.unit === "set" ? "Set" : "Pcs"}</Label>
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  placeholder={formatNumber(item.unit === "set" ? item.product.selling_price * item.product.pcs_per_set : item.product.selling_price)}
+                                  value={item.customPrice ?? ""}
+                                  onChange={(e) => updateCartCustomPrice(item.product.id, item.unit, e.target.value)}
+                                  className="h-8 text-sm"
+                                />
+                                {item.customPrice !== null && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 text-xs px-2"
+                                    onClick={() => updateCartCustomPrice(item.product.id, item.unit, "")}
+                                  >
+                                    Reset
+                                  </Button>
+                                )}
+                              </div>
+                              {item.customPrice !== null && (
+                                <p className="text-xs text-orange-500 mt-0.5">
+                                  Harga normal: {formatCurrency(item.unit === "set" ? item.product.selling_price * item.product.pcs_per_set : item.product.selling_price)}
+                                </p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <Label className="text-xs text-muted-foreground">Subtotal</Label>
+                              <p className="font-semibold text-sm">
+                                {formatCurrency(getEffectivePrice(item) * item.quantity)}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
                     <div className="flex justify-between pt-2 border-t font-medium">
                       <span>Total</span>
                       <span className="text-primary">
-                        {formatCurrency(stokKeluarCart.reduce((sum, item) => sum + item.product.selling_price * item.quantity, 0))}
+                        {formatCurrency(stokKeluarCart.reduce((sum, item) => sum + getEffectivePrice(item) * item.quantity, 0))}
                       </span>
                     </div>
                   </div>
