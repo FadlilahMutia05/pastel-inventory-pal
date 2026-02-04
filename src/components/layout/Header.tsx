@@ -1,5 +1,4 @@
 import { Bell, TrendingUp } from "lucide-react";
-import logoImage from "@/assets/logo.jpg";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -78,11 +77,9 @@ export default function Header({ title }: HeaderProps) {
       <div className="h-full flex items-center justify-between px-4 md:px-6">
         {/* Left - Logo & Title */}
         <div className="flex items-center gap-3">
-          <img 
-            src={logoImage} 
-            alt="Mao~Mao Store" 
-            className="w-10 h-10 rounded-xl shadow-soft object-cover"
-          />
+          <div className="w-10 h-10 rounded-xl bg-white shadow-soft flex items-center justify-center">
+            <span className="text-2xl">🎁</span>
+          </div>
           <div className="hidden sm:block">
             <h1 className="font-display font-bold text-lg text-foreground">
               {title}

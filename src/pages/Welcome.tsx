@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Sparkles, Package, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import logoImage from "@/assets/logo.jpg";
 
 const Sparkle = ({ delay, x, y }: { delay: number; x: string; y: string }) => (
   <motion.div
@@ -98,11 +97,9 @@ export default function Welcome() {
             transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
           >
             <div className="relative">
-              <img 
-                src={logoImage} 
-                alt="Mao~Mao Store" 
-                className="w-24 h-24 md:w-32 md:h-32 rounded-3xl shadow-card object-cover"
-              />
+              <div className="w-24 h-24 md:w-32 md:h-32 rounded-3xl bg-white/90 shadow-card flex items-center justify-center">
+                <span className="text-5xl md:text-6xl">🎁</span>
+              </div>
               <motion.div
                 className="absolute -top-2 -right-2"
                 animate={{ scale: [1, 1.2, 1] }}

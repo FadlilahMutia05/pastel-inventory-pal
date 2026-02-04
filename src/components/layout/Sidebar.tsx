@@ -9,7 +9,6 @@ import {
   BarChart3,
   Users,
 } from "lucide-react";
-import logoImage from "@/assets/logo.jpg";
 
 const navItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -52,11 +51,9 @@ export default function Sidebar() {
       {/* Bottom branding */}
       <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-sidebar-border">
         <div className="flex items-center gap-3">
-          <img 
-            src={logoImage} 
-            alt="Mao~Mao Store" 
-            className="w-10 h-10 rounded-xl shadow-soft object-cover"
-          />
+          <div className="w-10 h-10 rounded-xl bg-white shadow-soft flex items-center justify-center">
+            <span className="text-xl">🎁</span>
+          </div>
           <div>
             <p className="font-display font-bold text-sm">Mao~Mao Store</p>
             <p className="text-xs text-muted-foreground">Blindbox Manager</p>
