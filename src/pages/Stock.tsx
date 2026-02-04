@@ -1660,6 +1660,14 @@ function EditProductForm({
   const [setsPerKarton, setSetsPerKarton] = useState(product.sets_per_karton.toString());
   const [lowStockThreshold, setLowStockThreshold] = useState(product.low_stock_threshold.toString());
   const [photoUrl, setPhotoUrl] = useState(product.photo_url || "");
+  const [uploadMethod, setUploadMethod] = useState<"url" | "file">("url");
+
+  // Auto-calculated prices
+  const pricePerPcs = parseFloat(sellingPrice) || 0;
+  const pcsPerSetNum = parseInt(pcsPerSet) || 1;
+  const setsPerKartonNum = parseInt(setsPerKarton) || 1;
+  const pricePerSet = pricePerPcs * pcsPerSetNum;
+  const pricePerKarton = pricePerSet * setsPerKartonNum;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1667,9 +1675,9 @@ function EditProductForm({
       id: product.id,
       name,
       sku,
-      selling_price: parseFloat(sellingPrice) || 0,
-      pcs_per_set: parseInt(pcsPerSet) || 1,
-      sets_per_karton: parseInt(setsPerKarton) || 1,
+      selling_price: pricePerPcs,
+      pcs_per_set: pcsPerSetNum,
+      sets_per_karton: setsPerKartonNum,
       low_stock_threshold: parseInt(lowStockThreshold) || 5,
       photo_url: photoUrl || null,
     });
@@ -1677,6 +1685,7 @@ function EditProductForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Nama Produk */}
       <div className="space-y-2">
         <Label>Nama Produk *</Label>
         <Input
@@ -1684,76 +1693,204 @@ function EditProductForm({
           onChange={(e) => setName(e.target.value)}
           placeholder="Nama produk"
           required
+          className="bg-primary/5 border-primary/20"
         />
       </div>
 
+      {/* SKU */}
       <div className="space-y-2">
-        <Label>SKU *</Label>
+        <Label>SKU (Kode Produk) *</Label>
         <Input
           value={sku}
           onChange={(e) => setSku(e.target.value)}
           placeholder="SKU"
           required
+          className="bg-primary/5 border-primary/20"
         />
       </div>
 
+      {/* Stok Ready Info */}
       <div className="space-y-2">
-        <Label>URL Foto</Label>
+        <Label>Stok Ready (pcs)</Label>
         <Input
-          value={photoUrl}
-          onChange={(e) => setPhotoUrl(e.target.value)}
-          placeholder="https://..."
+          value={product.totalStock?.toString() || "0"}
+          disabled
+          className="bg-muted"
         />
+        <p className="text-xs text-muted-foreground">Stok yang siap dijual (dalam satuan pcs)</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label>Pcs per Set</Label>
-          <Input
-            type="number"
-            min="1"
-            value={pcsPerSet}
-            onChange={(e) => setPcsPerSet(e.target.value)}
-          />
+      {/* Upload Foto Produk */}
+      <div className="space-y-3 p-3 rounded-lg bg-blue-50/50 border border-blue-100">
+        <div className="flex items-center gap-2">
+          <span className="text-blue-500">📷</span>
+          <Label className="font-medium">Upload Foto Produk</Label>
         </div>
+        
         <div className="space-y-2">
-          <Label>Set per Karton</Label>
-          <Input
-            type="number"
-            min="1"
-            value={setsPerKarton}
-            onChange={(e) => setSetsPerKarton(e.target.value)}
-          />
+          <Label className="text-sm text-muted-foreground">Metode Upload</Label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setUploadMethod("url")}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all border ${
+                uploadMethod === "url"
+                  ? "bg-white border-primary/30 text-foreground shadow-sm"
+                  : "bg-transparent border-transparent text-muted-foreground"
+              }`}
+            >
+              🔗 URL
+            </button>
+            <button
+              type="button"
+              onClick={() => setUploadMethod("file")}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all border ${
+                uploadMethod === "file"
+                  ? "bg-white border-primary/30 text-foreground shadow-sm"
+                  : "bg-transparent border-transparent text-muted-foreground"
+              }`}
+            >
+              📁 File
+            </button>
+          </div>
+        </div>
+
+        {uploadMethod === "url" ? (
+          <div className="space-y-2">
+            <Label className="text-sm">Masukkan URL Foto Produk</Label>
+            <Input
+              value={photoUrl}
+              onChange={(e) => setPhotoUrl(e.target.value)}
+              placeholder="Contoh: https://example.com/photo.jpg"
+            />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Label className="text-sm">Upload dari File</Label>
+            <p className="text-xs text-muted-foreground">Upload file tidak tersedia dalam mode edit. Gunakan URL.</p>
+          </div>
+        )}
+
+        {photoUrl && (
+          <div className="mt-2">
+            <Label className="text-sm">Preview</Label>
+            <img 
+              src={photoUrl} 
+              alt="Preview" 
+              className="w-20 h-20 object-cover rounded-lg border mt-1"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Konfigurasi Unit */}
+      <div className="space-y-3 p-3 rounded-lg bg-purple-50/50 border border-purple-100">
+        <div className="flex items-center gap-2">
+          <span className="text-purple-500">⚙️</span>
+          <Label className="font-medium">Konfigurasi Unit</Label>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label className="text-sm">1 Set = <span className="text-primary">berapa pcs?</span></Label>
+            <Input
+              type="number"
+              min="1"
+              value={pcsPerSet}
+              onChange={(e) => setPcsPerSet(e.target.value)}
+              placeholder="Contoh: 12"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm">1 Karton = <span className="text-primary">berapa pcs?</span></Label>
+            <Input
+              type="number"
+              min="1"
+              value={setsPerKarton}
+              onChange={(e) => setSetsPerKarton(e.target.value)}
+              placeholder="Contoh: 144"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      {/* Harga Jual */}
+      <div className="space-y-3 p-3 rounded-lg bg-green-50/50 border border-green-100">
+        <div className="flex items-center gap-2">
+          <span className="text-green-500">💰</span>
+          <Label className="font-medium">Harga Jual</Label>
+        </div>
+        
         <div className="space-y-2">
-          <Label>Harga Jual per Pcs</Label>
+          <Label className="text-sm">Harga Jual per pcs (Rp) *</Label>
           <Input
             type="number"
             min="0"
             value={sellingPrice}
             onChange={(e) => setSellingPrice(e.target.value)}
+            className="bg-yellow-50 border-yellow-200"
+            required
           />
+          {pricePerPcs > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Laba: <span className="text-green-600">Dihitung dari harga modal batch</span>
+            </p>
+          )}
         </div>
-        <div className="space-y-2">
-          <Label>Batas Stok Menipis</Label>
-          <Input
-            type="number"
-            min="0"
-            value={lowStockThreshold}
-            onChange={(e) => setLowStockThreshold(e.target.value)}
-          />
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label className="text-sm">Harga Jual per set (Rp) <span className="text-muted-foreground text-xs">opsional</span></Label>
+            <Input
+              type="number"
+              value={pricePerSet.toString()}
+              disabled
+              className="bg-muted"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm">Harga Jual per karton (Rp) <span className="text-muted-foreground text-xs">opsional</span></Label>
+            <Input
+              type="number"
+              value={pricePerKarton.toString()}
+              disabled
+              className="bg-muted"
+            />
+          </div>
         </div>
       </div>
 
+      {/* Batas Stok */}
+      <div className="space-y-2">
+        <Label>Batas Stok Menipis (pcs)</Label>
+        <Input
+          type="number"
+          min="0"
+          value={lowStockThreshold}
+          onChange={(e) => setLowStockThreshold(e.target.value)}
+        />
+      </div>
+
+      {/* Buttons */}
       <div className="flex gap-3 pt-2">
-        <Button type="submit" disabled={isLoading} className="flex-1">
-          {isLoading ? "Menyimpan..." : "Simpan"}
+        <Button 
+          type="submit" 
+          disabled={isLoading} 
+          className="flex-1 gap-2"
+          style={{ background: "linear-gradient(135deg, hsl(165, 60%, 45%) 0%, hsl(180, 50%, 45%) 100%)" }}
+        >
+          ✨ {isLoading ? "Menyimpan..." : "Simpan Perubahan"}
         </Button>
-        <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
-          Batal
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={onCancel} 
+          className="flex-1 gap-2"
+        >
+          ❌ Batal
         </Button>
       </div>
     </form>
