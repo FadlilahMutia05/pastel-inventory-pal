@@ -9,11 +9,13 @@ import {
   BarChart3,
   Users,
   Settings,
+  Box,
 } from "lucide-react";
 import { useStoreSettings } from "@/hooks/use-store-settings";
 
 const navItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/products", label: "Produk", icon: Box },
   { path: "/stock", label: "Kelola Stok", icon: Package },
   { path: "/cargo", label: "Kargo Masuk", icon: Truck },
   { path: "/sales", label: "Penjualan", icon: ShoppingCart },
