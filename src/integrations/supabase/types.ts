@@ -246,6 +246,7 @@ export type Database = {
           notes: string | null
           shipped_date: string | null
           shipping_cost: number | null
+          shipping_type: string
           status: string
           subtotal: number
           total_amount: number
@@ -267,6 +268,7 @@ export type Database = {
           notes?: string | null
           shipped_date?: string | null
           shipping_cost?: number | null
+          shipping_type?: string
           status?: string
           subtotal?: number
           total_amount?: number
@@ -288,6 +290,7 @@ export type Database = {
           notes?: string | null
           shipped_date?: string | null
           shipping_cost?: number | null
+          shipping_type?: string
           status?: string
           subtotal?: number
           total_amount?: number
