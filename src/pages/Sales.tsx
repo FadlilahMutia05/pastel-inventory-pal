@@ -50,9 +50,11 @@ const SHIPPING_TYPES = [
 const COURIERS_BY_TYPE: Record<string, string[]> = {
   instant: ["Gojek", "Grab", "Lalamove", "Maxim", "InDriver"],
   sameday: ["Gojek", "Grab", "Lalamove", "AnterAja Same Day", "SiCepat Same Day"],
-  normal: ["JNE", "SiCepat", "J&T", "AnterAja", "Ninja", "ID Express", "Pos Indonesia"],
-  cargo: ["Indah Cargo", "Dakota Cargo", "Herona Express", "Pahala Express", "Sentral Cargo"],
+  normal: ["JNE", "SiCepat", "J&T", "SPX", "AnterAja", "Ninja", "ID Express", "Pos Indonesia"],
+  cargo: ["Indah Cargo", "Dakota Cargo", "J&T Cargo", "Herona Express", "Pahala Express", "Sentral Cargo"],
 };
+
+const CUSTOM_OPTION = "__custom__";
 
 export default function Sales() {
   const { toast } = useToast();
@@ -65,6 +67,8 @@ export default function Sales() {
   const [customerAddress, setCustomerAddress] = useState("");
   const [shippingType, setShippingType] = useState("normal");
   const [courier, setCourier] = useState("JNE");
+  const [isCustomCourier, setIsCustomCourier] = useState(false);
+  const [customCourierName, setCustomCourierName] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
   const [shippingCost, setShippingCost] = useState(0);
 
@@ -72,7 +76,23 @@ export default function Sales() {
   const handleShippingTypeChange = (type: string) => {
     setShippingType(type);
     setCourier(COURIERS_BY_TYPE[type]?.[0] || "");
+    setIsCustomCourier(false);
+    setCustomCourierName("");
   };
+
+  // Handle courier selection
+  const handleCourierChange = (value: string) => {
+    if (value === CUSTOM_OPTION) {
+      setIsCustomCourier(true);
+      setCourier("");
+    } else {
+      setIsCustomCourier(false);
+      setCourier(value);
+    }
+  };
+
+  // Get the final courier name
+  const getFinalCourier = () => isCustomCourier ? customCourierName : courier;
 
   // Query products with stock
   const { data: products, isLoading } = useQuery({
@@ -127,7 +147,7 @@ export default function Sales() {
           customer_city: customerCity || null,
           customer_address: customerAddress || null,
           shipping_type: shippingType,
-          courier,
+          courier: getFinalCourier(),
           tracking_number: trackingNumber || null,
           subtotal,
           shipping_cost: shippingCost,
@@ -229,6 +249,8 @@ export default function Sales() {
       setCustomerAddress("");
       setShippingType("normal");
       setCourier("JNE");
+      setIsCustomCourier(false);
+      setCustomCourierName("");
       setTrackingNumber("");
       setShippingCost(0);
       toast({
@@ -513,18 +535,44 @@ export default function Sales() {
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-2">
                       <Label>Nama Ekspedisi</Label>
-                      <Select value={courier} onValueChange={setCourier}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pilih ekspedisi" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {COURIERS_BY_TYPE[shippingType]?.map((c) => (
-                            <SelectItem key={c} value={c}>
-                              {c}
+                      {isCustomCourier ? (
+                        <div className="flex gap-1">
+                          <Input
+                            value={customCourierName}
+                            onChange={(e) => setCustomCourierName(e.target.value)}
+                            placeholder="Nama ekspedisi..."
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-10 w-10 shrink-0"
+                            onClick={() => {
+                              setIsCustomCourier(false);
+                              setCourier(COURIERS_BY_TYPE[shippingType]?.[0] || "");
+                            }}
+                          >
+                            ✕
+                          </Button>
+                        </div>
+                      ) : (
+                        <Select value={courier} onValueChange={handleCourierChange}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Pilih ekspedisi" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {COURIERS_BY_TYPE[shippingType]?.map((c) => (
+                              <SelectItem key={c} value={c}>
+                                {c}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value={CUSTOM_OPTION} className="text-primary">
+                              + Lainnya (custom)
                             </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                          </SelectContent>
+                        </Select>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>No. Resi</Label>
