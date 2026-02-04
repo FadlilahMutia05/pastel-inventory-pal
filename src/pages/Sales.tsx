@@ -40,7 +40,19 @@ interface CartItem {
   quantity: number;
 }
 
-const COURIERS = ["JNE", "SiCepat", "J&T", "AnterAja", "Ninja", "ID Express", "Pos Indonesia"];
+const SHIPPING_TYPES = [
+  { value: "instant", label: "Instant", description: "Pengiriman dalam kota (Gojek, Grab, dll)" },
+  { value: "sameday", label: "Same Day", description: "Sampai hari yang sama" },
+  { value: "normal", label: "Normal", description: "Ekspedisi reguler (JNE, SiCepat, dll)" },
+  { value: "cargo", label: "Cargo", description: "Pengiriman besar/bulk" },
+];
+
+const COURIERS_BY_TYPE: Record<string, string[]> = {
+  instant: ["Gojek", "Grab", "Lalamove", "Maxim", "InDriver"],
+  sameday: ["Gojek", "Grab", "Lalamove", "AnterAja Same Day", "SiCepat Same Day"],
+  normal: ["JNE", "SiCepat", "J&T", "AnterAja", "Ninja", "ID Express", "Pos Indonesia"],
+  cargo: ["Indah Cargo", "Dakota Cargo", "Herona Express", "Pahala Express", "Sentral Cargo"],
+};
 
 export default function Sales() {
   const { toast } = useToast();
@@ -51,9 +63,16 @@ export default function Sales() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerCity, setCustomerCity] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
+  const [shippingType, setShippingType] = useState("normal");
   const [courier, setCourier] = useState("JNE");
   const [trackingNumber, setTrackingNumber] = useState("");
   const [shippingCost, setShippingCost] = useState(0);
+
+  // Update courier when shipping type changes
+  const handleShippingTypeChange = (type: string) => {
+    setShippingType(type);
+    setCourier(COURIERS_BY_TYPE[type]?.[0] || "");
+  };
 
   // Query products with stock
   const { data: products, isLoading } = useQuery({
@@ -107,6 +126,7 @@ export default function Sales() {
           customer_phone: customerPhone || null,
           customer_city: customerCity || null,
           customer_address: customerAddress || null,
+          shipping_type: shippingType,
           courier,
           tracking_number: trackingNumber || null,
           subtotal,
@@ -207,6 +227,8 @@ export default function Sales() {
       setCustomerPhone("");
       setCustomerCity("");
       setCustomerAddress("");
+      setShippingType("normal");
+      setCourier("JNE");
       setTrackingNumber("");
       setShippingCost(0);
       toast({
@@ -466,15 +488,37 @@ export default function Sales() {
                       />
                     </div>
                   </div>
+                  {/* Shipping Type Selection */}
+                  <div className="space-y-2">
+                    <Label>Tipe Pengiriman</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {SHIPPING_TYPES.map((type) => (
+                        <button
+                          key={type.value}
+                          type="button"
+                          onClick={() => handleShippingTypeChange(type.value)}
+                          className={`p-2 rounded-lg border text-left transition-all ${
+                            shippingType === type.value
+                              ? "border-primary bg-primary/10 ring-1 ring-primary"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          <p className="font-medium text-sm">{type.label}</p>
+                          <p className="text-xs text-muted-foreground truncate">{type.description}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-2">
-                      <Label>Ekspedisi</Label>
+                      <Label>Nama Ekspedisi</Label>
                       <Select value={courier} onValueChange={setCourier}>
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Pilih ekspedisi" />
                         </SelectTrigger>
                         <SelectContent>
-                          {COURIERS.map((c) => (
+                          {COURIERS_BY_TYPE[shippingType]?.map((c) => (
                             <SelectItem key={c} value={c}>
                               {c}
                             </SelectItem>
