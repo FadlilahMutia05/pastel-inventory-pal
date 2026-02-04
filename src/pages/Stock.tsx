@@ -42,6 +42,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -590,6 +596,50 @@ export default function Stock() {
       toast({
         title: "Produk dihapus",
         description: "Produk berhasil dihapus dari sistem",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update product mutation
+  const updateProductMutation = useMutation({
+    mutationFn: async (data: { 
+      id: string; 
+      name: string; 
+      sku: string; 
+      selling_price: number; 
+      pcs_per_set: number; 
+      sets_per_karton: number; 
+      low_stock_threshold: number;
+      photo_url: string | null;
+    }) => {
+      const { error } = await supabase
+        .from("products")
+        .update({
+          name: data.name,
+          sku: data.sku,
+          selling_price: data.selling_price,
+          pcs_per_set: data.pcs_per_set,
+          sets_per_karton: data.sets_per_karton,
+          low_stock_threshold: data.low_stock_threshold,
+          photo_url: data.photo_url,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", data.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products-with-stock"] });
+      setEditingProduct(null);
+      toast({
+        title: "Produk diperbarui",
+        description: "Data produk berhasil diperbarui",
       });
     },
     onError: (error: any) => {
@@ -1561,6 +1611,151 @@ export default function Stock() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Product Dialog */}
+      <Dialog open={!!editingProduct} onOpenChange={() => setEditingProduct(null)}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Produk</DialogTitle>
+          </DialogHeader>
+          {editingProduct && (
+            <EditProductForm 
+              product={editingProduct} 
+              onSave={(data) => updateProductMutation.mutate(data)}
+              onCancel={() => setEditingProduct(null)}
+              isLoading={updateProductMutation.isPending}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </AppLayout>
+  );
+}
+
+// Edit Product Form Component
+function EditProductForm({ 
+  product, 
+  onSave, 
+  onCancel,
+  isLoading 
+}: { 
+  product: Product; 
+  onSave: (data: { 
+    id: string; 
+    name: string; 
+    sku: string; 
+    selling_price: number; 
+    pcs_per_set: number; 
+    sets_per_karton: number; 
+    low_stock_threshold: number;
+    photo_url: string | null;
+  }) => void;
+  onCancel: () => void;
+  isLoading: boolean;
+}) {
+  const [name, setName] = useState(product.name);
+  const [sku, setSku] = useState(product.sku);
+  const [sellingPrice, setSellingPrice] = useState(product.selling_price.toString());
+  const [pcsPerSet, setPcsPerSet] = useState(product.pcs_per_set.toString());
+  const [setsPerKarton, setSetsPerKarton] = useState(product.sets_per_karton.toString());
+  const [lowStockThreshold, setLowStockThreshold] = useState(product.low_stock_threshold.toString());
+  const [photoUrl, setPhotoUrl] = useState(product.photo_url || "");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      id: product.id,
+      name,
+      sku,
+      selling_price: parseFloat(sellingPrice) || 0,
+      pcs_per_set: parseInt(pcsPerSet) || 1,
+      sets_per_karton: parseInt(setsPerKarton) || 1,
+      low_stock_threshold: parseInt(lowStockThreshold) || 5,
+      photo_url: photoUrl || null,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label>Nama Produk *</Label>
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Nama produk"
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>SKU *</Label>
+        <Input
+          value={sku}
+          onChange={(e) => setSku(e.target.value)}
+          placeholder="SKU"
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>URL Foto</Label>
+        <Input
+          value={photoUrl}
+          onChange={(e) => setPhotoUrl(e.target.value)}
+          placeholder="https://..."
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <Label>Pcs per Set</Label>
+          <Input
+            type="number"
+            min="1"
+            value={pcsPerSet}
+            onChange={(e) => setPcsPerSet(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Set per Karton</Label>
+          <Input
+            type="number"
+            min="1"
+            value={setsPerKarton}
+            onChange={(e) => setSetsPerKarton(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <Label>Harga Jual per Pcs</Label>
+          <Input
+            type="number"
+            min="0"
+            value={sellingPrice}
+            onChange={(e) => setSellingPrice(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Batas Stok Menipis</Label>
+          <Input
+            type="number"
+            min="0"
+            value={lowStockThreshold}
+            onChange={(e) => setLowStockThreshold(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="flex gap-3 pt-2">
+        <Button type="submit" disabled={isLoading} className="flex-1">
+          {isLoading ? "Menyimpan..." : "Simpan"}
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
+          Batal
+        </Button>
+      </div>
+    </form>
   );
 }
