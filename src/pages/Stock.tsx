@@ -14,7 +14,11 @@ import {
   CheckCircle,
   XCircle,
   BarChart3,
+  Plus,
+  Minus,
 } from "lucide-react";
+import { StockInDialog } from "@/components/products/StockInDialog";
+import { StockOutDialog } from "@/components/products/StockOutDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,6 +61,10 @@ export default function Stock() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+  
+  // Stock dialogs state
+  const [stockInProduct, setStockInProduct] = useState<ProductStock | null>(null);
+  const [stockOutProduct, setStockOutProduct] = useState<ProductStock | null>(null);
 
   // Query products with stock and value calculations
   const { data: products, isLoading } = useQuery({
@@ -352,30 +360,29 @@ export default function Stock() {
         <Card className="glass-card">
           <CardContent className="p-0">
             <Table>
-              <TableHeader>
+                <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[300px]">Produk</TableHead>
+                  <TableHead className="w-[250px]">Produk</TableHead>
                   <TableHead>Seri</TableHead>
-                  <TableHead className="text-right">Total Stok</TableHead>
+                  <TableHead className="text-right">Stok</TableHead>
                   <TableHead className="text-right">Nilai Asset</TableHead>
-                  <TableHead className="text-right">Harga Modal</TableHead>
-                  <TableHead className="text-right">Harga Jual</TableHead>
                   <TableHead className="text-right">Potensi Laba</TableHead>
                   <TableHead className="text-center">Status</TableHead>
+                  <TableHead className="text-center">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={8}>
+                      <TableCell colSpan={7}>
                         <div className="animate-shimmer h-12 rounded" />
                       </TableCell>
                     </TableRow>
                   ))
                 ) : filteredProducts?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12">
+                    <TableCell colSpan={7} className="text-center py-12">
                       <Package className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
                       <p className="text-muted-foreground">Tidak ada produk ditemukan</p>
                     </TableCell>
@@ -420,12 +427,6 @@ export default function Stock() {
                         <TableCell className="text-right">
                           {formatCurrency(product.totalValue)}
                         </TableCell>
-                        <TableCell className="text-right text-muted-foreground">
-                          {formatCurrency(product.avgCostPrice)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(product.selling_price)}
-                        </TableCell>
                         <TableCell className="text-right">
                           <div>
                             <p className={`font-medium ${product.potentialProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
@@ -447,6 +448,27 @@ export default function Stock() {
                             {status.label}
                           </Badge>
                         </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                              onClick={() => setStockInProduct(product)}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                              onClick={() => setStockOutProduct(product)}
+                              disabled={product.totalStock === 0}
+                            >
+                              <Minus className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     );
                   })
@@ -456,6 +478,18 @@ export default function Stock() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Stock Dialogs */}
+      <StockInDialog
+        product={stockInProduct}
+        open={!!stockInProduct}
+        onOpenChange={(open) => !open && setStockInProduct(null)}
+      />
+      <StockOutDialog
+        product={stockOutProduct}
+        open={!!stockOutProduct}
+        onOpenChange={(open) => !open && setStockOutProduct(null)}
+      />
     </AppLayout>
   );
 }
