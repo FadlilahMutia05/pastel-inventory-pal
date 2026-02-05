@@ -7,6 +7,9 @@ export interface StoreSettings {
   tagline: string | null;
   logo_url: string | null;
   logo_emoji: string | null;
+  theme_preset: string | null;
+  primary_color: string | null;
+  background_color: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useApplyTheme } from "@/hooks/use-theme-colors";
 import Welcome from "./pages/Welcome";
 import Dashboard from "./pages/Dashboard";
 import Stock from "./pages/Stock";
@@ -17,26 +18,35 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+function AppContent() {
+  // Apply theme colors from settings
+  useApplyTheme();
+  
+  return (
+    <Routes>
+      <Route path="/" element={<Welcome />} />
+      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/stock" element={<Stock />} />
+      <Route path="/cargo" element={<Cargo />} />
+      <Route path="/sales" element={<Sales />} />
+      <Route path="/transactions" element={<Transactions />} />
+      <Route path="/reports" element={<Reports />} />
+      <Route path="/suppliers" element={<Suppliers />} />
+      <Route path="/products" element={<Products />} />
+      <Route path="/settings" element={<Settings />} />
+      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Welcome />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/stock" element={<Stock />} />
-          <Route path="/cargo" element={<Cargo />} />
-          <Route path="/sales" element={<Sales />} />
-          <Route path="/transactions" element={<Transactions />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/suppliers" element={<Suppliers />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/settings" element={<Settings />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AppContent />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
