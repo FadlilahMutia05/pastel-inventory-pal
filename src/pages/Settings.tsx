@@ -13,6 +13,7 @@ import {
   useUpdateStoreSettings,
   useUploadLogo,
 } from "@/hooks/use-store-settings";
+import ThemeColorPicker from "@/components/settings/ThemeColorPicker";
 
 const EMOJI_OPTIONS = ["🎁", "🎀", "🛍️", "✨", "🌸", "💖", "🎈", "🎊", "🧸", "🎭", "🎨", "🌟"];
 
@@ -320,6 +321,9 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
+          
+          {/* Theme Color Picker */}
+          <ThemeColorPicker />
         </motion.div>
       </div>
     </AppLayout>

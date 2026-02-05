@@ -310,30 +310,39 @@ export type Database = {
       }
       store_settings: {
         Row: {
+          background_color: string | null
           created_at: string
           id: string
           logo_emoji: string | null
           logo_url: string | null
+          primary_color: string | null
           store_name: string
           tagline: string | null
+          theme_preset: string | null
           updated_at: string
         }
         Insert: {
+          background_color?: string | null
           created_at?: string
           id?: string
           logo_emoji?: string | null
           logo_url?: string | null
+          primary_color?: string | null
           store_name?: string
           tagline?: string | null
+          theme_preset?: string | null
           updated_at?: string
         }
         Update: {
+          background_color?: string | null
           created_at?: string
           id?: string
           logo_emoji?: string | null
           logo_url?: string | null
+          primary_color?: string | null
           store_name?: string
           tagline?: string | null
+          theme_preset?: string | null
           updated_at?: string
         }
         Relationships: []
