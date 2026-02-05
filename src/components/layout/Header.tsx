@@ -1,4 +1,5 @@
-import { Bell, TrendingUp } from "lucide-react";
+import { Bell, TrendingUp, Home } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,6 +17,7 @@ interface HeaderProps {
 }
 
 export default function Header({ title }: HeaderProps) {
+  const navigate = useNavigate();
   // Query for low stock products
   const { data: lowStockProducts } = useQuery({
     queryKey: ["low-stock-products"],
@@ -83,13 +85,17 @@ export default function Header({ title }: HeaderProps) {
       <div className="h-full flex items-center justify-between px-4 md:px-6">
         {/* Left - Logo & Title */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white shadow-soft flex items-center justify-center overflow-hidden">
+          <button
+            onClick={() => navigate("/")}
+            className="w-10 h-10 rounded-xl bg-white shadow-soft flex items-center justify-center overflow-hidden hover:shadow-card transition-shadow cursor-pointer"
+            title="Kembali ke Beranda"
+          >
             {logoUrl ? (
               <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
             ) : (
               <span className="text-2xl">{logoEmoji}</span>
             )}
-          </div>
+          </button>
           <div className="hidden sm:block">
             <h1 className="font-display font-bold text-lg text-foreground">
               {storeName}
