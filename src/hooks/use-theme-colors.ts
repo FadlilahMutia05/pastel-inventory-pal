@@ -1,5 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useStoreSettings } from "./use-store-settings";
+
+const THEME_CACHE_KEY = "app-theme-cache";
 
 // Theme presets dengan HSL values
 export const THEME_PRESETS = {
@@ -135,8 +137,33 @@ function applyThemeColors(primary: string, background: string) {
   );
 }
 
+// Apply cached theme immediately on module load to prevent flash
+function applyCachedTheme() {
+  try {
+    const cached = localStorage.getItem(THEME_CACHE_KEY);
+    if (cached) {
+      const { primary, background } = JSON.parse(cached);
+      applyThemeColors(primary, background);
+    }
+  } catch {
+    // ignore parse errors
+  }
+}
+
+// Run immediately when module is imported
+applyCachedTheme();
+
+function cacheTheme(primary: string, background: string) {
+  try {
+    localStorage.setItem(THEME_CACHE_KEY, JSON.stringify({ primary, background }));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 export function useApplyTheme() {
   const { data: settings } = useStoreSettings();
+  const appliedRef = useRef(false);
   
   useEffect(() => {
     if (!settings) return;
@@ -146,8 +173,12 @@ export function useApplyTheme() {
     if (preset && THEME_PRESETS[preset]) {
       const theme = THEME_PRESETS[preset];
       applyThemeColors(theme.primary, theme.background);
+      cacheTheme(theme.primary, theme.background);
+      appliedRef.current = true;
     } else if (settings.primary_color && settings.background_color) {
       applyThemeColors(settings.primary_color, settings.background_color);
+      cacheTheme(settings.primary_color, settings.background_color);
+      appliedRef.current = true;
     }
   }, [settings]);
 }
