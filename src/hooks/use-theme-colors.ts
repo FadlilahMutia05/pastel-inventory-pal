@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useStoreSettings } from "./use-store-settings";
 
 const THEME_CACHE_KEY = "app-theme-cache";
@@ -163,7 +163,6 @@ function cacheTheme(primary: string, background: string) {
 
 export function useApplyTheme() {
   const { data: settings } = useStoreSettings();
-  const appliedRef = useRef(false);
   
   useEffect(() => {
     if (!settings) return;
@@ -174,11 +173,9 @@ export function useApplyTheme() {
       const theme = THEME_PRESETS[preset];
       applyThemeColors(theme.primary, theme.background);
       cacheTheme(theme.primary, theme.background);
-      appliedRef.current = true;
     } else if (settings.primary_color && settings.background_color) {
       applyThemeColors(settings.primary_color, settings.background_color);
       cacheTheme(settings.primary_color, settings.background_color);
-      appliedRef.current = true;
     }
   }, [settings]);
 }
